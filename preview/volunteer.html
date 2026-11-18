@@ -549,9 +549,9 @@ html.bb-large .vol-toast{bottom:calc(102px + env(safe-area-inset-bottom,0px))}
   }
 }
 </style>
+<link rel="stylesheet" href="./supabase-pages.css">
 </head>
 <body>
-<div role="note" style="position:relative;z-index:9999;padding:14px 18px;background:#fff1bf;color:#342800;font:600 16px/1.6 system-ui,sans-serif;border-bottom:2px solid #a47800">新版界面预览：当前路标、投稿和审核只保存在本机浏览器，未接入云端，请勿用于实际出行或正式投稿。<a href="../index.html" style="color:#173e2b;text-decoration:underline;margin-left:8px">返回云端正式版</a></div>
 
 <!-- 页面唯一根容器：#view-vol（四端合并时逐字保留） -->
 <div id="view-vol" class="view">
@@ -582,13 +582,27 @@ html.bb-large .vol-toast{bottom:calc(102px + env(safe-area-inset-bottom,0px))}
   <!-- 👉 要插图就去掉下行注释，换成你的图片文件名 -->
   <!-- <img src="你的图片.jpg" style="width:100%"> -->
 
-  <main class="vol-main" id="volMain">
+  <section id="page-account" class="page-account vol-card" aria-label="帮步账号">
+  <form hidden>
+    <h2>志愿者登录或注册</h2>
+    <label>邮箱 <input type="email" name="email" autocomplete="email" maxlength="254" required></label>
+    <label>密码 <input type="password" name="password" autocomplete="current-password" minlength="6" required></label>
+    <div class="page-account-actions"><button class="vol-btn vol-btn-primary" type="submit" value="login">登录</button>
+    <button class="vol-btn vol-btn-secondary" type="submit" value="register">注册</button>    </div>
+  </form>
+  <div class="page-account-controls" hidden>
+    <button class="vol-btn" type="button" data-refresh>刷新路标</button>
+    <button class="vol-btn" type="button" data-sign-out>退出登录</button>
+  </div>
+  <p role="status">正在恢复登录状态…</p>
+</section>
+  <main class="vol-main" id="volMain" hidden>
     <section id="volPanelCollect" class="vol-panel" aria-label="采集"></section>
     <section id="volPanelPostcard" class="vol-panel" aria-label="声音明信片" hidden></section>
     <section id="volPanelMine" class="vol-panel" aria-label="我的" hidden></section>
   </main>
 
-  <nav class="vol-tabbar" aria-label="主导航">
+  <nav class="vol-tabbar" aria-label="主导航" hidden>
     <button type="button" class="vol-tab" data-tab="collect" aria-current="page" aria-label="采集：记录一条声音路标">
       <span class="vol-tab-ico" aria-hidden="true">◎</span><span>采集</span>
     </button>
@@ -615,6 +629,9 @@ html.bb-large .vol-toast{bottom:calc(102px + env(safe-area-inset-bottom,0px))}
   <p style="padding:20px">这个页面需要启用 JavaScript 才能采集声音路标。</p>
 </noscript>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+<script src="../cloud.js"></script>
+<script src="./supabase-pages.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -628,7 +645,6 @@ html.bb-large .vol-toast{bottom:calc(102px + env(safe-area-inset-bottom,0px))}
    ============================================================ */
 const CONFIG={
   appTitle:'帮步 Bamboo · 竹小节',
-  apiBase:'local',            // ← 第1问答案写这里：'local' 或服务器地址
   mediaPlan:'还没定',         // ← 第2问答案写这里：'服务器硬盘'/'腾讯云COS'/'还没定'（只记录，不影响本文件）
   guidePrompt:'请照着说：我现在在___，眼前的路况是___，视障朋友需要注意___',
   pcPrompt:'录一句 15 秒以内的问候。例如：这段路我替你走过啦，前面右转就是电梯，别着急，慢慢来。',
@@ -673,151 +689,8 @@ const CONFIG={
 /* ============================================================
    公共契约 4.3：统一数据层（逐字保留，函数名与行为不得改动）
    ============================================================ */
-const BambooDB=(()=>{
-  const LS='app_bamboo_marks', DBN='app_bamboo_media';
-  const API={ base:'local', setBase(b){this.base=b;} };
-  function load(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return[]}}
-  function persist(l){localStorage.setItem(LS,JSON.stringify(l))}
-  function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);
-    r.onupgradeneeded=()=>r.result.createObjectStore('media');
-    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);})}
-  async function putMedia(key,blob){const db=await idb();
-    return new Promise((res,rej)=>{const tx=db.transaction('media','readwrite');
-      tx.objectStore('media').put(blob,key); tx.oncomplete=()=>res(key);
-      tx.onerror=()=>rej(tx.error);})}
-  async function getMedia(key){const db=await idb();
-    return new Promise((res,rej)=>{const tx=db.transaction('media','readonly');
-      const rq=tx.objectStore('media').get(key);
-      rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);})}
-  // AI 初审占位规则（将来替换为服务器调用，此处保留函数形状）
-  function aiReview(m){
-    const flags=[];let score=60;
-    if(!m.audio||!m.audio.duration||m.audio.duration<20)flags.push('录音时长不足');
-    if(m.blindPath&&m.blindPath.status==='未知')flags.push('盲道状态模糊');
-    if(!m.place||m.place.length<2)flags.push('点位名称不完整');
-    if(!m.audio||!m.audio.duration)flags.push('文字替代录音');
-    if(m.audio&&m.audio.duration>=20)score+=15;
-    if(m.blindPath&&m.blindPath.status!=='未知')score+=10;
-    if(m.place&&m.place.length>=4)score+=10;
-    if(m.photo&&m.photo.mediaKey)score+=5;
-    return{verdict:flags.length?'unsure':'pass',
-           score:Math.min(100,score),flags};
-  }
-  const PKEY='app_bamboo_postcards';
-  function loadPC(){try{return JSON.parse(localStorage.getItem(PKEY)||'[]')}catch(e){return[]}}
-  function persistPC(l){localStorage.setItem(PKEY,JSON.stringify(l))}
-  async function savePostcard(p){  // 明信片：独立功能，但同样走审核流程
-    p.state='queue';
-    p.humanReview={status:null,reviewer:null,tags:[],note:null,reviewedAt:null};
-    const l=loadPC();l.unshift(p);persistPC(l);return p}
-  async function listPostcards(f){let l=loadPC();
-    if(f&&f.state)l=l.filter(p=>p.state===f.state);return l}
-  async function updatePostcard(id,patch){const l=loadPC();
-    const p=l.find(x=>x.id===id);
-    if(p){Object.assign(p,patch);persistPC(l)}return p}
+const BambooDB = routePageStore("volunteer");
 
-  async function saveMark(m){          // 提交或重提（重提复用原 id）
-    m.aiReview=aiReview(m);
-    m.state=m.aiReview.verdict==='pass'?'published':'queue';
-    m.humanReview={status:null,reviewer:null,tags:[],note:null,reviewedAt:null};
-    const l=load();const i=l.findIndex(x=>x.id===m.id);
-    if(i>-1){l[i]=m}else{m.usage=m.usage||{listens:0,confirm:0,inaccurate:0};l.unshift(m)}
-    persist(l);return m;
-  }
-  async function updateMark(id,patch){const l=load();const m=l.find(x=>x.id===id);
-    if(m){Object.assign(m,patch);persist(l)}return m}
-  async function listMarks(f){let l=load();
-    if(f&&f.state)l=l.filter(m=>m.state===f.state);return l}
-  async function markInaccurate(id){const l=load();const m=l.find(x=>x.id===id);
-    if(m&&m.state==='published'){m.usage.inaccurate++;
-      m.aiReview.flags=['竹语、竹影反馈不准'];m.state='queue';persist(l)}return m}
-  async function markConfirm(id){const l=load();const m=l.find(x=>x.id===id);
-    if(m&&m.state==='published'){m.usage.confirm++;persist(l)}return m}
-  return{API,load,persist,listMarks,saveMark,updateMark,markInaccurate,markConfirm,
-         savePostcard,listPostcards,updatePostcard,putMedia,getMedia};
-})();
-// 服务器模式预留：当 BambooDB.API.base 不是 'local' 时，上述各函数应改走
-// fetch(base + '/marks' 等) 标准接口。
-// 登录层预留：将来加管理员/志愿者账号（或更换登录体系）时，只需在此数据层
-// 统一附加登录凭证，页面其余代码不动。
-// 原型阶段仅要求在文件顶部用注释写明 TODO，不必实现。
-
-/* ============================================================
-   公共契约 4.4：种子数据（首次打开时写入，四端完全相同）
-   ============================================================ */
-function seedIfNeeded(){
-  if(localStorage.getItem('app_bamboo_marks'))return;
-  const now=Date.now(),D=86400000;
-  const seeds=[
-   {id:'BM0001',place:'地铁2号线C口无障碍电梯',lat:31.2323,lng:121.4691,
-    submittedAt:now-3*D,vol:{anonId:'竹小节A1024',zhuli:36},
-    audio:{mediaKey:null,duration:42,aiText:'电梯在C口右手边约五米，入口有触觉提示砖，轿厢语音报层清晰，出电梯右转即是盲道。'},
-    photo:{mediaKey:null,aiText:'垂直电梯一部，门框有黄色提示条'},
-    blindPath:{status:'畅通',checkedAt:now-3*D},
-    aiReview:{verdict:'pass',score:88,flags:[]},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:12,confirm:5,inaccurate:0},state:'published'},
-   {id:'BM0002',place:'人民广场东南角盲道',lat:31.2304,lng:121.4737,
-    submittedAt:now-2*D,vol:{anonId:'竹小节B2077',zhuli:18},
-    audio:{mediaKey:null,duration:35,aiText:'东南角共享单车常压占盲道约十米，绕行请靠右侧花坛边缘。'},
-    photo:{mediaKey:null,aiText:'盲道上停有多辆共享单车'},
-    blindPath:{status:'被占用',checkedAt:now-2*D},
-    aiReview:{verdict:'pass',score:82,flags:[]},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:8,confirm:2,inaccurate:0},state:'published'},
-   {id:'BM0003',place:'天桥下中山北路口',lat:31.2341,lng:121.4712,
-    submittedAt:now-1*D,vol:{anonId:'竹小节A1024',zhuli:36},
-    audio:{mediaKey:null,duration:12,aiText:'路口……（此处录音过短）'},
-    photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-1*D},
-    aiReview:{verdict:'unsure',score:45,flags:['录音时长不足']},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
-   {id:'BM0004',place:'公交17路站台',lat:31.2287,lng:121.4750,
-    submittedAt:now-1*D,vol:{anonId:'竹小节B2077',zhuli:18},
-    audio:{mediaKey:null,duration:28,aiText:'站台有无障碍坡道，候车椅在头节车厢对应位置。'},
-    photo:{mediaKey:null,aiText:'站台照壁为广告灯箱'},
-    blindPath:{status:'部分破损',checkedAt:now-1*D},
-    aiReview:{verdict:'unsure',score:58,flags:['描述与图片不一致']},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
-   {id:'BM0005',place:'医院北门坡道',lat:31.2350,lng:121.4668,
-    submittedAt:now-5*D,vol:{anonId:'竹小节A1024',zhuli:36},
-    audio:{mediaKey:null,duration:22,aiText:'北门坡道较陡，两侧有双层扶手。'},
-    photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-5*D},
-    aiReview:{verdict:'unsure',score:52,flags:['录音时长不足']},
-    humanReview:{status:'returned',reviewer:'审核员R01',
-      tags:['录音听不清'],note:'风声盖过人声，请靠近话筒或到避风处重录。',
-      reviewedAt:now-4*D},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'returned'},
-   {id:'BM0006',place:'学校东门',lat:31.2295,lng:121.4680,
-    submittedAt:now-6*D,vol:{anonId:'竹小节B2077',zhuli:18},
-    audio:{mediaKey:null,duration:31,aiText:'东门放学时段人流量大，门内左侧有休息座椅。'},
-    photo:{mediaKey:null,aiText:'画面中有多名学生人脸'},
-    blindPath:{status:'未知',checkedAt:now-6*D},
-    aiReview:{verdict:'unsure',score:55,flags:['疑似含隐私']},
-    humanReview:{status:'rejected',reviewer:'审核员R01',
-      tags:['疑似含隐私'],note:'画面含学生人脸，请重新拍摄避开人脸。',
-      reviewedAt:now-6*D},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'rejected'}
-  ];
-  localStorage.setItem('app_bamboo_marks',JSON.stringify(seeds));
-  if(!localStorage.getItem('app_bamboo_postcards')){
-    localStorage.setItem('app_bamboo_postcards',JSON.stringify([
-      {id:'PC0001',toMarkId:'BM0001',vol:{anonId:'竹小节B2077'},
-       text:'给在这里遇到的你：这段路我替你走过啦，右转的电梯很好找，别着急，慢慢来。',
-       mediaKey:null,duration:12,submittedAt:now-1*D,state:'queue',
-       humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null}}
-    ]));
-  }
-}
-seedIfNeeded();
-// 注意：种子条目 mediaKey 为 null（无真实音频/图片文件），
-// 播放/查看时应显示「演示数据 · 原声占位」并用 speechSynthesis 朗读
-// aiText 代替原声（仅种子条目允许这样做，用户真实提交的一律播真实录音）。
-
-/* ============================================================
-   常量与工具
-   ============================================================ */
 const DAY=86400000;
 const STEP_KEYS=['place','audio','blind','photo','preview','submit'];
 const BLIND_OPTIONS=[
@@ -828,7 +701,7 @@ const BLIND_OPTIONS=[
 ];
 const MARK_STATES={
   published:{label:'已发布',sym:'✓',cls:'published'},
-  queue:{label:'AI存疑 · 审核中',sym:'…',cls:'queue'},
+  queue:{label:'待人工审核',sym:'…',cls:'queue'},
   returned:{label:'退回待修改',sym:'↩',cls:'returned'},
   rejected:{label:'已驳回',sym:'✕',cls:'rejected'},
   hidden:{label:'已隐藏',sym:'⏸',cls:'hidden'}
@@ -839,7 +712,6 @@ const PC_STATES={
   returned:{label:'退回待修改',sym:'↩',cls:'returned'},
   rejected:{label:'已驳回',sym:'✕',cls:'rejected'}
 };
-const SEED_IDS=['BM0001','BM0002','BM0003','BM0004','BM0005','BM0006'];
 
 const $=(sel,root)=> (root||document).querySelector(sel);
 const $$=(sel,root)=> Array.prototype.slice.call((root||document).querySelectorAll(sel));
@@ -870,26 +742,11 @@ function writeLS(key,val){
 /* ============================================================
    志愿者身份 / 竹粒 / 徽章
    ============================================================ */
-function makeAnonId(){
-  const letters='ABCDEFGHJKLMNPQRSTUVWXYZ';
-  return '竹小节'+letters[Math.floor(Math.random()*letters.length)]+String(Math.floor(1000+Math.random()*9000));
-}
 function getProfile(){
-  let p=readLS('app_bamboo_profile',null);
-  if(!p || typeof p!=='object' || !p.anonId){
-    p={anonId:makeAnonId(),zhuli:0,submits:0,badges:[]};
-    writeLS('app_bamboo_profile',p);
-  }
-  p.zhuli=Number(p.zhuli)||0;
-  p.submits=Number(p.submits)||0;
-  if(!Array.isArray(p.badges)) p.badges=[];
-  // 徽章按竹粒自动匹配（10 / 30 / 60），不需要手动开关
-  const derived=badgesFor(p.zhuli);
-  if(derived.join('|')!==p.badges.join('|')){
-    p.badges=derived;
-    writeLS('app_bamboo_profile',p);
-  }
-  return p;
+  const user=cloudSession?.user;
+  const submits=BambooDB.load().length;
+  const zhuli=submits*CONFIG.zhuliGain;
+  return {anonId:user?'竹小节'+user.id.slice(0,6).toUpperCase():'',submits,zhuli,badges:badgesFor(zhuli)};
 }
 function badgesFor(points){
   return CONFIG.badgeRules.filter(r=>points>=r.n).map(r=>r.name);
@@ -913,9 +770,7 @@ function badgeLabel(name){
   return (rule&&rule.title)?(name+'（'+rule.title+'）'):name;
 }
 function myMarks(){
-  const me=getProfile();
-  return BambooDB.load()
-    .filter(m=>m.vol && m.vol.anonId===me.anonId)
+  return BambooDB.load().slice()
     .sort((a,b)=>(b.submittedAt||0)-(a.submittedAt||0));
 }
 
@@ -1448,8 +1303,7 @@ function renderCollect(focus){
 
 function collectHomeHTML(){
   const p=getProfile();
-  const mine=BambooDB.load().filter(function(m){return m.vol&&m.vol.anonId===p.anonId;});
-  const returned=mine.filter(function(m){return m.state==='returned';});
+  const mine=myMarks();
   return ''
   +'<section class="vol-card vol-hero">'
   +'  <div class="vol-hero-inner">'
@@ -1457,7 +1311,7 @@ function collectHomeHTML(){
   +'      <div class="vol-hero-copy">'
   +'        <p class="vol-eyebrow">'+leafIco()+'竹小节 · 采集</p>'
   +'        <h2 class="vol-h2" data-title tabindex="-1">把眼前的路，<br>说给下一个人听</h2>'
-  +'        <p class="vol-lead">一条声音路标 = 定位 + 一段口述 + 盲道状态。提交后先过 AI 初审，通过就立即发布给视障朋友。</p>'
+  +'        <p class="vol-lead">上传现场录音、填写地点和文字描述。管理员审核通过后，视障朋友就能查看。</p>'
   +'      </div>'
   +'      <div class="vol-hero-mascot" aria-hidden="true">'+bambooMascot()+'</div>'
   +'    </div>'
@@ -1470,13 +1324,6 @@ function collectHomeHTML(){
   +'  </div>'
   +'</section>'
   +bambooDivider()
-  +(returned.length
-    ? '<section class="vol-card vol-note-box vol-note-warn">'
-      +'<h3 class="vol-h3">↩ 有 '+returned.length+' 条被退回，待你修改</h3>'
-      +'<p class="vol-help">竹卫留下了修改建议。改好后会沿用原编号重新提交，再走一次 AI 初审。</p>'
-      +'<div class="vol-stack"><button type="button" class="vol-btn vol-btn-secondary vol-btn-block" data-act="edit-returned" aria-label="查看并修改被退回的条目">查看并修改</button></div>'
-      +'</section>'
-    : '')
   +'<section class="vol-card">'
   +'  <h3 class="vol-h3">'+leafIco()+'采集前的三个小提醒</h3>'
   +'  <ul class="vol-tips">'
@@ -1521,8 +1368,7 @@ function stepBody(step){
     +'    <span class="vol-label">点位名称（必填，至少 2 个字）</span>'
     +'    <input class="vol-input" id="volPlace" data-field="place" type="text" value="'+esc(d.place||'')+'" maxlength="40" autocomplete="off" spellcheck="false" aria-describedby="volPlaceHelp">'
     +'  </label>'
-    +'  <p class="vol-help" id="volPlaceHelp">写清「在哪 + 什么设施」，例如「地铁2号线C口无障碍电梯」。坐标只用于记录位置。</p>'
-    +returnedNoteHTML()
+    +'  <p class="vol-help" id="volPlaceHelp">写清「在哪 + 什么设施」，例如「地铁2号线C口无障碍电梯」。如果开启定位，提交审核通过后，坐标会随路标公开。</p>'
     +'</section>';
   }
   if(step===2){
@@ -1536,6 +1382,8 @@ function stepBody(step){
     +'    <button type="button" class="vol-btn vol-btn-secondary vol-btn-sm" data-act="speak" aria-label="朗读引导提示词">🔊 朗读提示词</button>'
     +'  </div>'
     +recorderHTML(S.markRec,'')
+    +'<label class="vol-field" for="volAudioFile"><span class="vol-label">或选择录音文件</span><input id="volAudioFile" type="file" accept="audio/*,.webm,.m4a"></label>'
+    +'<label class="vol-field" for="volRouteSummary"><span class="vol-label">路标文字描述（必填）</span><textarea class="vol-textarea" id="volRouteSummary" data-field="routeSummary" rows="4" maxlength="800" placeholder="写下路况和需要注意的地方">'+esc(d.summary||'')+'</textarea></label>'
     +'</section>';
   }
   if(step===3){
@@ -1571,26 +1419,27 @@ function stepBody(step){
   }
   if(step===5){
     const R=S.markRec;
-    const hasAudio=!!(R.mode!=='text'&&R.blob);
-    const text=(R.text||'').trim();
+    const hasAudio=!!(R.blob);
+    const text=(d.summary||'').trim();
     const audioValue=hasAudio
       ? ('真实录音 '+fmtClock(R.secs))
-      : (text?('文字描述：'+truncate(text,52)):'未提供（提交后会进入人工审核）');
+      : '未添加录音';
     const photoHTML=c.photo
       ? '<img class="vol-thumb" src="'+c.photo.url+'" alt="环境照片缩略图">'
       : '<span class="vol-row-value">未添加</span>';
     return ''
     +'<section class="vol-card" aria-labelledby="volStepTitle">'
     +'  <h2 class="vol-h2" id="volStepTitle" data-title tabindex="-1">'+leafIco()+esc(stepTitle(5))+'</h2>'
-    +'  <p class="vol-lead">确认无误后提交。提交后不能直接改动；被退回可以修改后重提。</p>'
+    +'  <p class="vol-lead">确认无误后提交人工审核。审核通过后，描述、录音和照片会公开。</p>'
     +'  <div class="vol-review">'
     +'    <div class="vol-row"><div class="vol-row-main"><span class="vol-row-label">点位名称</span><span class="vol-row-value">'+esc(d.place||'（未填写）')+'</span></div><button type="button" class="vol-btn vol-btn-ghost vol-btn-sm" data-act="edit-step" data-step="1" aria-label="修改点位名称">修改</button></div>'
     +'    <div class="vol-row"><div class="vol-row-main"><span class="vol-row-label">声音 / 文字</span><span class="vol-row-value">'+esc(audioValue)+'</span></div><button type="button" class="vol-btn vol-btn-ghost vol-btn-sm" data-act="edit-step" data-step="2" aria-label="修改声音或文字">修改</button></div>'
     +'    <div class="vol-row"><div class="vol-row-main"><span class="vol-row-label">盲道状态</span><span class="vol-row-value">'+esc(d.status||'未知（未标记）')+'</span></div><button type="button" class="vol-btn vol-btn-ghost vol-btn-sm" data-act="edit-step" data-step="3" aria-label="修改盲道状态">修改</button></div>'
     +'    <div class="vol-row"><div class="vol-row-main"><span class="vol-row-label">环境照片</span>'+photoHTML+'</div><button type="button" class="vol-btn vol-btn-ghost vol-btn-sm" data-act="edit-step" data-step="4" aria-label="修改环境照片">修改</button></div>'
+    +'    <div class="vol-row"><div class="vol-row-main"><span class="vol-row-label">文字描述</span><span class="vol-row-value">'+esc(text||'未填写')+'</span></div></div>'
     +'  </div>'
     +(hasAudio?'<audio class="vol-audio" controls preload="metadata" src="'+R.url+'" aria-label="试听即将提交的录音"></audio>':'')
-    +(!hasAudio?'<p class="vol-warn">没有录音：这条会进入人工审核（属正常流程）。</p>':'')
+    +(!hasAudio?'<p class="vol-warn">请返回录音步骤，录制或选择一段音频。</p>':'')
     +'</section>';
   }
   return '';
@@ -1613,20 +1462,6 @@ function blindChoiceHTML(selected){
   }).join('');
 }
 
-function returnedNoteHTML(){
-  const d=S.collect.draft;
-  const hr=d&&d.note;
-  if(!hr||hr.status!=='returned') return '';
-  const tags=Array.isArray(hr.tags)?hr.tags:[];
-  return ''
-  +'<div class="vol-note-box vol-note-warn">'
-  +'  <h3 class="vol-h3">↩ 上次退回原因</h3>'
-  +(tags.length?'<p class="vol-tags">'+tags.map(function(t){return '<span class="vol-tag">'+esc(t)+'</span>';}).join('')+'</p>':'')
-  +'  <p>'+esc(hr.note||'竹卫未填写备注。')+'</p>'
-  +'  <p class="vol-help">改好后提交会沿用原编号 '+(d&&d.id?esc(d.id):'')+'，并重新走 AI 初审。</p>'
-  +'</div>';
-}
-
 function stepFoot(step){
   if(step===1){
     return ''
@@ -1636,17 +1471,11 @@ function stepFoot(step){
     +'</div>';
   }
   if(step===2){
-    const textMode=S.markRec.mode==='text';
     return ''
     +'<div class="vol-wizard-foot">'
     +'  <button type="button" class="vol-btn vol-btn-secondary" data-act="step-prev" aria-label="上一步：确认位置">← 上一步</button>'
     +'  <button type="button" class="vol-btn vol-btn-primary" data-act="step-next" aria-label="下一步：标记盲道状态">下一步：盲道</button>'
     +'</div>'
-    +'<div class="vol-skip">'
-    +(textMode
-      ? '<button type="button" class="vol-btn vol-btn-ghost" data-act="step-skip" aria-label="跳过录音与文字，直接下一步">跳过这一步</button>'
-      : '<button type="button" class="vol-btn vol-btn-ghost" data-act="rec-text" aria-label="暂不录音，改用文字描述">暂不录音，改用文字描述</button>')
-    +'</div>';
   }
   if(step===3){
     return ''
@@ -1678,7 +1507,7 @@ function stepFoot(step){
 function geoText(){
   const c=S.collect;
   const d=c.draft||{};
-  const place=(d.place&&d.place.trim())?d.place.trim():'人民广场附近';
+  const place=(d.place&&d.place.trim())?d.place.trim():'请填写点位名称';
   if(c.geo==='pending') return '正在获取当前位置…';
   if(c.geo==='ok' && typeof d.lat==='number' && typeof d.lng==='number'){
     return '✓ 位置已确认：'+place+'（坐标 '+d.lat+', '+d.lng+'）';
@@ -1696,32 +1525,13 @@ function refreshGeoText(){
 function resultHTML(){
   const r=S.collect.result;
   if(!r) return '';
-  const m=r.mark, p=r.profile;
-  const pass=m.state==='published';
-  const flags=(m.aiReview&&m.aiReview.flags)||[];
-  return ''
-  +'<section class="vol-card" aria-labelledby="volStepTitle">'
-  +'  <h2 class="vol-h2" id="volStepTitle" data-title tabindex="-1">'+(pass?'✅ 审核通过，已发布':'⚠ AI 初审存疑，已转人工审核')+'</h2>'
-  +'  <p class="vol-lead">'+(pass?'视障朋友现在可以在这个点位听到你的声音路标。':'竹卫会尽快处理，处理结果会显示在「我的提交」里。')+'</p>'
-  +'  <dl class="vol-kv">'
-  +'    <div><dt>点位</dt><dd>'+esc(m.place)+'</dd></div>'
-  +'    <div><dt>编号</dt><dd>'+esc(m.id)+(r.isEdit?'（沿用原编号重提）':'')+'</dd></div>'
-  +'    <div><dt>AI 初审</dt><dd>'+(pass?'通过':'存疑')+' · '+m.aiReview.score+' 分</dd></div>'
-  +(flags.length?'<div><dt>AI 标记</dt><dd>'+flags.map(esc).join('、')+'</dd></div>':'')
-  +'    <div><dt>竹粒</dt><dd>+'+r.gain+'（当前 '+p.zhuli+'）</dd></div>'
-  +'    <div><dt>徽章</dt><dd>'+(p.badges.length?esc(p.badges.join('、')):'暂无')+'</dd></div>'
-  +'  </dl>'
-  +(r.gained.length?'<p class="vol-ok">🏅 新获得徽章：'+esc(r.gained.map(badgeLabel).join('、'))+'</p>':'')
-  +'  <p class="vol-help">'+(r.isEdit?'已按原编号重新提交，并重新走 AI 初审。':'竹粒与徽章为原型阶段的本地模拟记录，接入后端后由服务器计算。')+'</p>'
-  +bambooDivider()
-  +'  <div class="vol-stack">'
-  +'    <button type="button" class="vol-btn vol-btn-primary vol-btn-block" data-act="again" aria-label="再记一条声音路标">再记一条</button>'
-  +'    <button type="button" class="vol-btn vol-btn-secondary vol-btn-block" data-act="goto-mine" aria-label="查看我的提交">查看我的提交</button>'
-  +'    <button type="button" class="vol-btn vol-btn-ghost vol-btn-block" data-act="goto-home" aria-label="回到采集首页">回到首页</button>'
-  +'  </div>'
-  +'</section>';
+  return '<section class="vol-card" aria-labelledby="volStepTitle">'
+    +'<h2 class="vol-h2" id="volStepTitle" data-title tabindex="-1">已提交，等待人工审核</h2>'
+    +'<p>点位：'+esc(r.place)+' · 编号：'+esc(r.id)+'</p>'
+    +'<p>审核结果会显示在「我的提交」里。</p>'
+    +'<button type="button" class="vol-btn vol-btn-primary" data-act="goto-mine">查看我的提交</button> '
+    +'<button type="button" class="vol-btn vol-btn-secondary" data-act="again">再记一条</button></section>';
 }
-
 /* ============================================================
    渲染：我的
    ============================================================ */
@@ -1916,7 +1726,7 @@ function mineHTML(p,mine){
   +'  <p class="vol-help">每提交一条声音路标 +'+CONFIG.zhuliGain+' 竹粒；每 '+CONFIG.zhuliPerNode+' 竹粒长一节竹子，竹粒越多，竹子越高。</p>'
   +badgeGridHTML(p)
   +growthHTML(p)
-  +'  <p class="vol-help">原型阶段竹粒与徽章写在本机 app_bamboo_profile 里；接入后端后由服务器计算并记录，前端只负责显示。</p>'
+  +'  <p class="vol-help">竹粒按当前账号的投稿数计算。</p>'
   +'</section>';
 }
 
@@ -1924,8 +1734,6 @@ function markCardHTML(m){
   const st=MARK_STATES[m.state]||{label:m.state||'未知',sym:'·',cls:'queue'};
   const checked=(m.blindPath&&m.blindPath.checkedAt)?m.blindPath.checkedAt:m.submittedAt;
   const old=(m.state==='published') && (Date.now()-checked>90*DAY);
-  const flags=(m.aiReview&&Array.isArray(m.aiReview.flags))?m.aiReview.flags:[];
-  const usage=m.usage||{listens:0,confirm:0,inaccurate:0};
   return ''
   +'<li class="vol-sub">'
   +'  <div class="vol-sub-head">'
@@ -1935,133 +1743,14 @@ function markCardHTML(m){
   +'  <p class="vol-meta">'+fmtDate(m.submittedAt)+' · 编号 '+esc(m.id)+'</p>'
   +'  <p class="vol-meta">盲道状态：'+esc((m.blindPath&&m.blindPath.status)||'未知')+' · 核对于 '+fmtDate(checked)+'</p>'
   +(old?'<p class="vol-warn">已超90天待复核</p>':'')
-  +(m.state==='published'?'<p class="vol-meta">被收听 '+usage.listens+' 次 · 确认准确 '+usage.confirm+' 次</p>':'')
-  +((m.state==='queue'&&flags.length)?'<p class="vol-meta">AI 标记：'+esc(flags.join('、'))+'</p>':'')
-  +reviewNoteHTML(m)
-  +(m.state==='returned'
-    ? '<div class="vol-stack"><button type="button" class="vol-btn vol-btn-secondary vol-btn-sm" data-act="mark-edit" data-id="'+esc(m.id)+'" aria-label="修改并重提：'+esc(m.place)+'">修改并重提</button></div>'
-    : '')
   +'</li>';
 }
 
-function reviewNoteHTML(m){
-  const hr=m.humanReview||{};
-  const tags=Array.isArray(hr.tags)?hr.tags:[];
-  const has=tags.length||hr.note;
-  if(m.state!=='returned'&&m.state!=='rejected'&&!has) return '';
-  const title=m.state==='rejected'?'✕ 驳回原因':(m.state==='returned'?'↩ 退回原因':'审核备注');
-  return '<div class="vol-reviewnote">'
-    +'<p class="vol-reviewnote-title">'+title+'</p>'
-    +(tags.length?'<p class="vol-tags">'+tags.map(function(t){return '<span class="vol-tag">'+esc(t)+'</span>';}).join('')+'</p>':'')
-    +'<p class="vol-reviewnote-text">'+esc(hr.note||'竹卫未填写备注。')+'</p>'
-    +'</div>';
-}
-
-/* ============================================================
-   渲染：明信片
-   ============================================================ */
 function renderPostcard(focus){
   const panel=$('#volPanelPostcard');
-  if(!panel) return Promise.resolve();
-  const token=++S.pc.token;
-  return Promise.all([loadMyPostcards(),BambooDB.listMarks()]).then(function(res){
-    if(token!==S.pc.token) return;
-    const list=res[0]||[];
-    const marks=res[1]||[];
-    const pub=marks.filter(function(m){return m.state==='published';});
-    const byId={};
-    marks.forEach(function(m){ byId[m.id]=m; });
-    panel.innerHTML=postcardHTML(list,pub,byId);
-    if(focus) focusTitle(panel);
-  }).catch(function(e){
-    console.error(e);
-    live('明信片列表读取失败，请刷新页面重试');
-  });
+  panel.innerHTML='<section class="vol-card"><h2 class="vol-h2" data-title tabindex="-1">声音明信片</h2><p>即将上线。</p></section>';
+  if(focus) focusTitle(panel);
 }
-
-function loadMyPostcards(){
-  const me=getProfile();
-  return BambooDB.listPostcards().then(function(all){
-    return (all||[]).filter(function(p){return p.vol&&p.vol.anonId===me.anonId;})
-      .sort(function(a,b){return (b.submittedAt||0)-(a.submittedAt||0);});
-  });
-}
-
-function postcardHTML(list,pub,byId){
-  const sent=S.pc.sent;
-  const selected=S.pc.placeId;
-  const options=pub.map(function(m){
-    return '<option value="'+esc(m.id)+'"'+(selected===m.id?' selected':'')+'>'+esc(m.place)+'</option>';
-  }).join('');
-  const pcList=list.length
-    ? '<ul class="vol-sublist">'+list.map(function(pc){return pcCardHTML(pc,byId);}).join('')+'</ul>'
-    : '<p class="vol-help">还没有寄出的明信片。</p>';
-  return ''
-  +'<section class="vol-card vol-card-sprig">'
-  +bambooSprigOutline()
-  +'  <div class="vol-card-body">'
-  +'    <h2 class="vol-h2" data-title tabindex="-1">'+leafIco()+'声音明信片</h2>'
-  +'    <p class="vol-lead">录一段 15 秒以内的问候，送给某个点位。审核通过后投放到该点位，视障朋友路过时就能听到。</p>'
-  +'  </div>'
-  +'</section>'
-  +bambooDivider()
-  +(sent
-    ? '<section class="vol-note-box vol-note-ok">'
-      +'<h3 class="vol-h3">✅ 明信片已寄出，等待审核</h3>'
-      +'<p>编号 '+esc(sent.id)+'，寄给「'+esc(sent.place)+'」。审核通过后会投放到该点位。</p>'
-      +'</section>'
-    : '')
-  +'<section class="vol-card">'
-  +'  <h3 class="vol-h3">1 · 录一段问候</h3>'
-  +'  <p class="vol-help">'+esc(CONFIG.pcPrompt)+'</p>'
-  +'  <p class="vol-help">录音和文字二选一即可，不需要两样都填；不想录音就往下写文字。</p>'
-  +recorderHTML(S.pcRec,'pc')
-  +'</section>'
-  +'<section class="vol-card">'
-  +'  <h3 class="vol-h3">2 · 送给哪个点位</h3>'
-  +(pub.length
-      ? '<label class="vol-field" for="volPcPlace">'
-        +'<span class="vol-label">选择点位（从已发布的路标里选）</span>'
-        +'<select class="vol-select" id="volPcPlace" data-field="pcPlace" aria-label="选择明信片送达的点位">'
-        +'<option value="">请选择一个点位</option>'+options
-        +'</select>'
-        +'</label>'
-      : '<p class="vol-note">目前还没有已发布的路标。先采集一条，通过审核后就能寄明信片了。</p>'
-        +'<div class="vol-stack"><button type="button" class="vol-btn vol-btn-secondary" data-act="goto-collect" aria-label="去采集一条声音路标">去采集</button></div>')
-  +'</section>'
-  +'<section class="vol-card">'
-  +'  <h3 class="vol-h3">3 · 问候文字</h3>'
-  +'  <p class="vol-help">录了音可以不写；没录音就写在这里。二选一即可。</p>'
-  +'  <label class="vol-field" for="volPcText">'
-  +'    <span class="vol-label">写一两句话（录了音可以不写；竹卫和竹语、竹影都会读到）</span>'
-  +'    <textarea class="vol-textarea" id="volPcText" data-field="pcText" rows="4" maxlength="160" placeholder="例如：这段路我替你走过啦，右转的电梯很好找，别着急，慢慢来。">'+esc(S.pc.text||'')+'</textarea>'
-  +'  </label>'
-  +'  <p class="vol-help">文字里如果有需要修改的词，会被提示重写后再寄出。</p>'
-  +'  <div class="vol-stack"><button type="button" class="vol-btn vol-btn-primary vol-btn-block" data-act="pc-send" aria-label="寄出这张声音明信片">寄出明信片</button></div>'
-  +'</section>'
-  +'<h3 class="vol-h3 vol-section-title">'+leafIco()+'我寄出的明信片（'+list.length+'）</h3>'
-  +pcList;
-}
-
-function pcCardHTML(pc,byId){
-  const st=PC_STATES[pc.state]||{label:pc.state||'未知',sym:'·',cls:'queue'};
-  const to=byId[pc.toMarkId];
-  const dur=Number(pc.duration)||0;
-  return ''
-  +'<li class="vol-sub">'
-  +'  <div class="vol-sub-head">'
-  +'    <h4 class="vol-sub-title">寄给：'+esc(to?to.place:'点位已下架')+'</h4>'
-  +'    <span class="vol-chip vol-chip-'+st.cls+'"><span aria-hidden="true">'+st.sym+'</span> '+esc(st.label)+'</span>'
-  +'  </div>'
-  +'  <p class="vol-meta">'+fmtDate(pc.submittedAt)+' · 编号 '+esc(pc.id)+(dur?(' · '+fmtClock(dur)+' 录音'):' · 文字明信片')+'</p>'
-  +'  <p class="vol-pc-text">'+(pc.text?esc(pc.text):'（语音明信片）')+'</p>'
-  +reviewNoteHTML(pc)
-  +'</li>';
-}
-
-/* ============================================================
-   渲染：录音区（两种流程共用）
-   ============================================================ */
 function recorderHTML(R,prefix){
   if(!R) return '';
   const isPc=prefix==='pc';
@@ -2097,7 +1786,7 @@ function recorderHTML(R,prefix){
     +(R.url?'<audio class="vol-audio" controls preload="metadata" src="'+R.url+'" aria-label="试听刚才录的声音">你的浏览器不支持音频播放。</audio>':'')
     +'  <div class="vol-rec-actions">'
     +'    <button type="button" class="vol-btn vol-btn-secondary vol-btn-sm" '+a('rec-redo')+' aria-label="重录">重录</button>'
-    +'    <button type="button" class="vol-btn vol-btn-ghost vol-btn-sm" '+a('rec-text')+' aria-label="改用文字描述">改用文字</button>'
+
     +'  </div>'
     +'</div>';
   }
@@ -2119,7 +1808,7 @@ function recorderHTML(R,prefix){
     +'  <p>浏览器或系统拒绝了麦克风（'+esc(R.err)+'）。请点击地址栏左侧的权限图标（🔒 / ⓘ），把「麦克风」改成「允许」，再点下面的按钮。</p>'
     +'  <div class="vol-rec-actions">'
     +'    <button type="button" class="vol-btn vol-btn-primary vol-btn-sm" '+a('rec-retry')+' aria-label="重新尝试录音">重新尝试录音</button>'
-    +'    <button type="button" class="vol-btn vol-btn-secondary vol-btn-sm" '+a('rec-text')+' aria-label="改用文字描述">改用文字描述</button>'
+
     +'  </div>'
     +'</div>';
   }
@@ -2131,7 +1820,7 @@ function recorderHTML(R,prefix){
   +'  <button type="button" class="vol-btn vol-btn-primary vol-btn-block" '+a('rec-start')+' aria-label="开始录音">'
   +'    <span aria-hidden="true">●</span> 开始录音'
   +'  </button>'
-  +'  <p class="vol-help">'+maxText+'录音在原型阶段只存在本机浏览器（IndexedDB）里。</p>'
+  +'  <p class="vol-help">'+maxText+'提交成功后，录音会随路标进入人工审核。</p>'
   +'</div>';
 }
 
@@ -2175,7 +1864,7 @@ function startWizard(){
   const c=S.collect;
   c.screen='wizard';
   c.step=1;
-  c.draft={id:null,place:'人民广场附近',lat:null,lng:null,status:'',note:null};
+  c.draft={id:null,place:'',lat:null,lng:null,status:'',note:null};
   c.photo=null;
   c.result=null;
   c.loading=false;
@@ -2220,7 +1909,7 @@ function requestGeo(){
 function wizardExit(){
   const c=S.collect;
   const R=S.markRec;
-  const dirty=!!((R&&(R.blob||(R.text||'').trim()||R.state==='recording'||R.state==='stopping'))||c.photo||(c.draft&&c.draft.id));
+  const dirty=Boolean(R.blob || R.state==='recording' || R.state==='stopping' || c.photo || c.draft?.summary);
   if(!dirty){ leaveWizard(); return; }
   openDialog({
     title:'放弃这次采集？',
@@ -2233,6 +1922,7 @@ function wizardExit(){
 }
 function leaveWizard(){
   const c=S.collect;
+  if(c.draft?.cloudDraft) discardDraftUploads(c.draft.cloudDraft);
   if(S.markRec) S.markRec.reset();
   if(c.photo&&c.photo.url){ try{ URL.revokeObjectURL(c.photo.url); }catch(e){} }
   c.screen='home';
@@ -2265,7 +1955,11 @@ function stepNext(){
     return;
   }
   if(c.step===2){
-    S.markRec.stop();
+    if(S.markRec.state==='recording'||S.markRec.state==='stopping'){
+      formError('请先停止录音，等录音准备好后再继续。'); return;
+    }
+    if(!S.markRec.blob){ formError('请录制或选择一段音频。'); return; }
+    if(!(c.draft.summary||'').trim()){ formError('请填写路标文字描述。',$('#volRouteSummary')); return; }
     c.step=3; renderCollect(true); return;
   }
   if(c.step===3){
@@ -2336,59 +2030,6 @@ function switchToAudio(R,kind){
   if(kind==='mark') markRecChanged(); else pcRecChanged();
 }
 
-async function editMark(id){
-  let all=[];
-  try{ all=await BambooDB.listMarks(); }catch(e){ all=[]; }
-  const m=all.filter(function(x){return x.id===id;})[0];
-  if(!m){ toast('找不到这条记录'); live('找不到这条记录'); return; }
-  if(m.state!=='returned'){ toast('只有「退回待修改」的条目可以重提'); live('只有被退回的条目可以修改重提'); return; }
-  const c=S.collect;
-  c.screen='wizard';
-  c.step=1;
-  c.draft={
-    id:m.id,
-    place:m.place||'',
-    lat:(typeof m.lat==='number')?m.lat:null,
-    lng:(typeof m.lng==='number')?m.lng:null,
-    status:(m.blindPath&&m.blindPath.status)||'',
-    note:m.humanReview||null
-  };
-  c.photo=null;
-  c.result=null;
-  c.loading=false;
-  c.geo=(typeof m.lat==='number'&&typeof m.lng==='number')?'ok':'fail';
-  c.geoMsg=(typeof m.lat==='number')?'':'原条目没有坐标';
-  if(S.markRec) S.markRec.reset();
-  if(m.audio&&m.audio.mediaKey){
-    try{
-      const blob=await BambooDB.getMedia(m.audio.mediaKey);
-      if(blob) S.markRec.loadBlob(blob,m.audio.duration||0);
-    }catch(e){}
-  }else if(m.audio&&m.audio.aiText&&!m.audio.duration){
-    S.markRec.mode='text';
-    S.markRec.state='text';
-    S.markRec.text=m.audio.aiText;
-  }
-  if(m.photo&&m.photo.mediaKey){
-    try{
-      const pb=await BambooDB.getMedia(m.photo.mediaKey);
-      if(pb){
-        c.photo={blob:pb,url:URL.createObjectURL(pb),name:m.photo.aiText||'环境照片'};
-      }
-    }catch(e){}
-  }
-  renderCollect(true);
-  live('已载入被退回的条目，可修改后重新提交');
-}
-
-function removePhoto(){
-  const c=S.collect;
-  if(c.photo&&c.photo.url){ try{ URL.revokeObjectURL(c.photo.url); }catch(e){} }
-  c.photo=null;
-  renderCollect(false);
-  toast('照片已删除');
-  live('照片已删除，可以重新选择或直接跳过');
-}
 
 function handlePhoto(e){
   const input=e.target;
@@ -2409,171 +2050,45 @@ function handlePhoto(e){
 
 async function submitMark(){
   const c=S.collect;
-  if(c.loading) return;
-  if(c.screen!=='wizard') return;
-  const d=c.draft||{};
-  const R=S.markRec;
-  const place=(d.place||'').trim();
-  if(place.length<2){
-    c.step=1;
-    renderCollect(true);
-    formError('点位名称至少写 2 个字，例如「人民广场东南角」',$('#volPlace'));
-    return;
-  }
-  const isEdit=!!d.id;
-  const id=d.id||nextMarkId();
-  const hasAudio=!!(R.mode!=='text'&&R.blob);
-  const dur=hasAudio?Math.max(0,Math.round(R.secs)):0;
-  const text=(R.text||'').trim();
-  const aiText=hasAudio?('（志愿者真实录音 · '+fmtClock(dur)+'，暂无文字稿）'):(text||'（未提供文字描述）');
-  const status=d.status||'未知';
-  if(!hasAudio&&!text) toast('没有录音也没有文字，提交后会直接进入人工审核');
-
+  const user=cloudSession?.user;
+  if(!user || c.loading || c.screen!=='wizard') return;
+  const d=c.draft;
+  const audio=S.markRec.blob;
+  const summary=(d.summary||'').trim();
+  if(!audio || !summary){ goStep(2); formError('请添加录音并填写文字描述。'); return; }
   c.loading=true;
-  const btn=$('[data-act="submit"]');
-  if(btn){ btn.disabled=true; btn.textContent='正在提交…'; btn.setAttribute('aria-busy','true'); }
+  const button=$('[data-act="submit"]');
+  if(button){ button.disabled=true; button.textContent='正在上传…'; }
   try{
-    let audioOk=hasAudio;
-    if(hasAudio){
-      try{ await BambooDB.putMedia('a-'+id,R.blob); }
-      catch(e){ audioOk=false; toast('录音没能写入本机存储，本次按占位文字提交'); }
-    }
-    let photoOk=!!(c.photo&&c.photo.blob);
-    if(photoOk){
-      try{ await BambooDB.putMedia('p-'+id,c.photo.blob); }
-      catch(e){ photoOk=false; toast('照片没能写入本机存储，已跳过照片'); }
-    }
-    const profile=getProfile();
-    let usage={listens:0,confirm:0,inaccurate:0};
-    if(isEdit){
-      try{
-        const all=await BambooDB.listMarks();
-        const old=all.filter(function(x){return x.id===id;})[0];
-        if(old&&old.usage) usage=old.usage;
-      }catch(e){}
-    }
-    const mark={
-      id:id,
-      place:place,
-      lat:(typeof d.lat==='number')?d.lat:null,
-      lng:(typeof d.lng==='number')?d.lng:null,
-      submittedAt:Date.now(),
-      vol:{anonId:profile.anonId,zhuli:profile.zhuli+CONFIG.zhuliGain},
-      audio:{mediaKey:audioOk?('a-'+id):null,duration:audioOk?dur:0,aiText:audioOk?aiText:(text||'（录音未能保存到本机存储）')},
-      photo:{mediaKey:photoOk?('p-'+id):null,aiText:photoOk?'志愿者上传的环境照片':null},
-      blindPath:{status:status,checkedAt:Date.now()},
-      aiReview:{verdict:'pass',score:0,flags:[]},
-      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-      usage:usage,
-      state:'queue'
-    };
-    const saved=await BambooDB.saveMark(mark);
-    const before=badgesFor(profile.zhuli);
-    profile.zhuli+=CONFIG.zhuliGain;
-    if(!isEdit) profile.submits+=1;
-    const after=badgesFor(profile.zhuli);
-    profile.badges=after;
-    writeLS('app_bamboo_profile',profile);
-    const gained=after.filter(function(b){return before.indexOf(b)<0;});
-    c.loading=false;
-    c.result={mark:saved,gain:CONFIG.zhuliGain,profile:profile,gained:gained,isEdit:isEdit};
+    const draft=d.cloudDraft ||= {stage:0};
+    Object.assign(draft,{
+      place:d.place,summary,audio,photos:{before:c.photo?.blob},
+      path:{status:pagePathCodes[d.status] ?? 'unknown'},
+      capture:{latitude:d.lat,longitude:d.lng,audio_seconds:S.markRec.secs ? Math.min(180,Math.max(1,Math.round(S.markRec.secs))) : null}
+    });
+    const id=await submitCloudRoute(draft,'竹小节'+user.id.slice(0,6).toUpperCase());
+    draft.stage=4;
+    if(cloudSession?.user.id!==user.id || c.draft!==d) return;
+    const place=d.place;
+    leaveWizard();
+    c.result={id,place};
     c.screen='result';
     c.step=6;
-    const photoUrl=c.photo&&c.photo.url;
-    if(S.markRec) S.markRec.reset();
-    if(photoUrl){ try{ URL.revokeObjectURL(photoUrl); }catch(e){} }
-    c.photo=null;
     renderCollect(true);
-    const msg=(saved.state==='published')
-      ?('提交成功，审核通过，已发布。获得 '+CONFIG.zhuliGain+' 竹粒。')
-      :('提交成功，AI 初审存疑，已转人工审核。获得 '+CONFIG.zhuliGain+' 竹粒。');
-    live(msg);
-    toast(saved.state==='published'?'✅ 审核通过，已发布':'⚠ AI 初审存疑，已转人工审核');
-  }catch(e){
-    c.loading=false;
-    if(btn){ btn.disabled=false; btn.textContent='提交'; btn.removeAttribute('aria-busy'); }
-    formError('提交失败：'+((e&&e.message)||'未知错误')+'，请重试。');
-  }
-}
-
-function nextMarkId(){
-  let max=0;
-  BambooDB.load().forEach(function(m){
-    const mm=/^BM(\d{4})$/.exec(m.id||'');
-    if(mm) max=Math.max(max,parseInt(mm[1],10));
-  });
-  return 'BM'+String(max+1).padStart(4,'0');
-}
-
-async function sendPostcard(){
-  if(S.pc.busy) return;
-  if(S.pcRec&&S.pcRec.state==='recording'){ formError('录音还没停止，请先点「停止录音」再寄出。',$('[data-act="pc-rec-stop"]')); return; }
-  const text=(S.pc.text||'').trim();
-  const R=S.pcRec;
-  const hasAudio=!!(R&&R.mode!=='text'&&R.blob);
-  let pub=[];
-  try{ pub=await BambooDB.listMarks({state:'published'}); }catch(e){ pub=[]; }
-  if(!S.pc.placeId){ formError('请选择要送给哪个点位',$('#volPcPlace')); return; }
-  const target=pub.filter(function(m){return m.id===S.pc.placeId;})[0];
-  if(!target){ formError('这个点位已不可选，请重新选择',$('#volPcPlace')); return; }
-  if(!hasAudio&&!text){ formError('请录一段问候，或写一两句文字（二选一即可）',$('#volPcText')); return; }
-  if(text.length>160){ formError('问候文字请控制在 160 字以内',$('#volPcText')); return; }
-  if(text){
-    const hit=CONFIG.rejectWords.filter(function(w){return w&&text.indexOf(w)>=0;})[0];
-    if(hit){ formError('问候文字里有需要修改的词（'+hit+'），请重写后再寄出。',$('#volPcText')); return; }
-  }
-
-  S.pc.busy=true;
-  const btn=$('[data-act="pc-send"]');
-  if(btn){ btn.disabled=true; btn.textContent='正在寄出…'; btn.setAttribute('aria-busy','true'); }
-  try{
-    const all=await BambooDB.listPostcards();
-    let max=0;
-    all.forEach(function(p){
-      const mm=/^PC(\d{4})$/.exec(p.id||'');
-      if(mm) max=Math.max(max,parseInt(mm[1],10));
-    });
-    const id='PC'+String(max+1).padStart(4,'0');
-    let duration=hasAudio?Math.max(1,Math.round(R.secs)):0;
-    let mediaKey=null;
-    if(hasAudio){
-      try{ mediaKey='a-'+id; await BambooDB.putMedia(mediaKey,R.blob); }
-      catch(e){
-        if(!text){ throw new Error('录音没能写入本机存储，请改用文字或重试'); }
-        mediaKey=null; duration=0; toast('录音没能写入本机存储，已按文字明信片寄出');
-      }
+    live('提交成功，等待人工审核。');
+    BambooDB.refresh().catch(error=>console.warn('Could not refresh submissions',error));
+  }catch(error){
+    console.warn('Could not submit route',error);
+    if(cloudSession?.user.id===user.id && c.draft===d){
+      const message=error instanceof Error ? error.message : '云端暂时无法保存路标，请重试。';
+      formError(message);
     }
-    const me=getProfile();
-    const pc={
-      id:id,
-      toMarkId:S.pc.placeId,
-      vol:{anonId:me.anonId},
-      text:text,
-      mediaKey:mediaKey,
-      duration:duration,
-      submittedAt:Date.now(),
-      state:'queue',
-      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null}
-    };
-    await BambooDB.savePostcard(pc);
-    S.pc.sent={id:id,place:target.place};
-    S.pc.text='';
-    S.pc.placeId='';
-    S.pc.busy=false;
-    S.pcRec.reset();
-    await renderPostcard(true);
-    live('明信片已寄出，等待审核');
-    toast('✅ 明信片已寄出，等待审核');
-  }catch(e){
-    S.pc.busy=false;
-    if(btn){ btn.disabled=false; btn.textContent='寄出明信片'; btn.removeAttribute('aria-busy'); }
-    formError('寄出失败：'+((e&&e.message)||'未知错误')+'，请重试。');
+  }finally{
+    if(c.draft===d) c.loading=false;
+    if(button){ button.disabled=false; button.textContent='提交'; }
   }
 }
 
-/* ============================================================
-   标签切换
-   ============================================================ */
 function showTab(tab,focus){
   if(['collect','postcard','mine'].indexOf(tab)<0) tab='collect';
   if(S.tab!==tab){
@@ -2592,7 +2107,11 @@ function showTab(tab,focus){
   });
   if(tab==='collect') renderCollect(!!focus);
   else if(tab==='postcard') renderPostcard(!!focus);
-  else renderMine(!!focus);
+  else {
+    renderMine(!!focus);
+    BambooDB.refresh().then(loaded=>{ if(loaded && S.tab==='mine') renderMine(false); })
+      .catch(()=>toast('暂时无法读取投稿，请点「刷新路标」重试。'));
+  }
 }
 
 /* ============================================================
@@ -2615,6 +2134,7 @@ function onRootClick(e){
 }
 
 function onField(e){
+  if(e.target.id==='volRouteSummary' && S.collect.draft){ S.collect.draft.summary=e.target.value; return; }
   const t=e.target;
   if(!t||!t.getAttribute) return;
   if(t.getAttribute('aria-invalid')) t.removeAttribute('aria-invalid');
@@ -2696,6 +2216,7 @@ function onDialogBackdrop(e){
 }
 
 async function handleAct(act,el){
+  if(S.collect.loading && !['large','identity'].includes(act)) return;
   if(act==='large'){
     const on=!document.documentElement.classList.contains('bb-large');
     applyLarge(on);
@@ -2721,27 +2242,12 @@ async function handleAct(act,el){
     S.collect.screen='home'; S.collect.draft=null; S.collect.photo=null;
     renderCollect(true); return;
   }
-  if(act==='edit-returned'){
-    const r=myMarks().filter(function(m){return m.state==='returned';})[0];
-    if(r) await editMark(r.id); else toast('没有待修改的退回条目');
-    return;
-  }
-  if(act==='mark-edit'){ await editMark(el.getAttribute('data-id')); return; }
   if(act==='rec-start'){ await S.markRec.start(); return; }
   if(act==='rec-stop'){ S.markRec.stop(); return; }
   if(act==='rec-retry'){ await S.markRec.start(); return; }
-  if(act==='rec-text'){ switchToText(S.markRec,'mark'); return; }
-  if(act==='rec-audio'){ switchToAudio(S.markRec,'mark'); return; }
   if(act==='rec-redo'){ S.markRec.discard(); markRecChanged(); return; }
-  if(act==='pc-rec-start'){ await S.pcRec.start(); return; }
-  if(act==='pc-rec-stop'){ S.pcRec.stop(); return; }
-  if(act==='pc-rec-retry'){ await S.pcRec.start(); return; }
-  if(act==='pc-rec-text'){ switchToText(S.pcRec,'pc'); return; }
-  if(act==='pc-rec-audio'){ switchToAudio(S.pcRec,'pc'); return; }
-  if(act==='pc-rec-redo'){ S.pcRec.discard(); pcRecChanged(); return; }
   if(act==='photo-pick'){ const f=$('#volPhotoInput'); if(f) f.click(); return; }
   if(act==='photo-remove'){ removePhoto(); return; }
-  if(act==='pc-send'){ await sendPostcard(); return; }
   if(act==='dialog-ok'){ closeDialog(true); return; }
   if(act==='dialog-cancel'){ closeDialog(false); return; }
   if(act==='edit-step'){
@@ -2761,7 +2267,17 @@ function bindGlobal(){
   on(root,'input',onField);
   on(root,'change',onField);
   on(root,'change',function(e){
-    if(e.target&&e.target.id==='volPhotoInput') handlePhoto(e);
+    if(e.target?.id==='volPhotoInput') handlePhoto(e);
+    if(e.target?.id==='volAudioFile'){
+      const file=e.target.files[0];
+      if(!file) return;
+      try{ validateRouteMedia(file,'audio'); }catch(error){ formError(error.message); return; }
+      const recorder=S.markRec;
+      recorder.reset();
+      recorder.loadBlob(file,0);
+      renderCollect(false);
+      live('录音文件已添加。');
+    }
   });
   on(root,'keydown',onKeydown);
   on(document,'click',onDocClick);
@@ -2778,7 +2294,6 @@ function init(){
   if(started) return;
   started=true;
   document.title=CONFIG.appTitle;
-  try{ if(CONFIG.apiBase&&CONFIG.apiBase!=='local') BambooDB.API.setBase(CONFIG.apiBase); }catch(e){}
   const s=readLS('app_bamboo_settings',{})||{};
   document.documentElement.classList.toggle('bb-large',!!s.large);
   syncLargeBtn();
@@ -2791,13 +2306,26 @@ function init(){
   S.collect.draft=null;
   S.collect.photo=null;
   if(!S.markRec) S.markRec=createRecorder('mark',180,markRecChanged);
-  if(!S.pcRec) S.pcRec=createRecorder('pc',15,pcRecChanged);
   bindGlobal();
   $$('.vol-panel').forEach(function(p){ p.hidden=(p.id!=='volPanelCollect'); });
   renderCollect(false);
   renderMine(false);
   renderPostcard(false);
-  live('已进入竹小节 · 采集');
+  setupPageAccount({role:'volunteer',store:BambooDB,content:[$('#volMain'),$('.vol-tabbar')],
+    render(){
+      if(S.tab==='mine') renderMine(false);
+      if(S.tab==='collect' && S.collect.screen==='home') renderCollect(false);
+    },
+    onSessionEnd(){ leaveWizard(); showTab('collect',false); },
+    beforeSignOut(){
+      const draft=S.collect.draft?.cloudDraft;
+      if(draft) return discardDraftUploads(draft);
+    },
+    canSignOut(){
+      if(S.collect.loading){ toast('请等当前路标上传完成。'); return false; }
+      return true;
+    }
+  });
 }
 
 function destroy(){
@@ -2805,7 +2333,7 @@ function destroy(){
   geoTok++;
   S.pc.token++;
   if(S.markRec) S.markRec.destroy();
-  if(S.pcRec) S.pcRec.destroy();
+
   if('speechSynthesis' in window){ try{ window.speechSynthesis.cancel(); }catch(e){} }
   if(toastTimer){ clearTimeout(toastTimer); toastTimer=null; }
   if(liveTimer){ clearTimeout(liveTimer); liveTimer=null; }
@@ -2825,61 +2353,5 @@ init();
 
 })();
 </script>
-
-<!--
-====================================================================
-【修改说明】
-1. 改文字：
-   找到 <script> 最上方的「👉 【文字配置区】」，修改 CONFIG 里的
-   appTitle、guidePrompt、pcPrompt、steps、zhuliGain、badgeRules、
-   rejectWords、identities 即可；页面中的短提示语在下方渲染函数里。
-2. 调字号：
-   只改 :root 里的 --fs-title / --fs-subtitle / --fs-body / --fs-small /
-   --btn-h 五组数字；放大模式改 html.bb-large 里的同一组数字。
-   不要写小于 14px 的字号（放大模式下不小于 18px）。
-3. 加图片：
-   在 <header> 后面预留了插图位置，把这两行的注释去掉并换成文件名：
-     👉 要插图就去掉下行注释，换成你的图片文件名
-     <img src="你的图片.jpg" style="width:100%">
-   图片文件必须和 volunteer.html 放在同一个文件夹里。
-4. 换后端 / 换存储：
-   CONFIG.apiBase 填服务器地址（默认 'local' 表示数据存本机浏览器）；
-   CONFIG.mediaPlan 只记录媒体方案（服务器硬盘 / 腾讯云COS），不参与运行。
-   原型阶段录音、照片都存浏览器 IndexedDB；接入后端时按 BambooDB 里
-   预留的 TODO 改走 fetch 即可，页面代码不用动。
-5. 四端合并：
-   保持根容器 <div id="view-vol" class="view">、所有类名的 vol- 前缀、
-   全部 JS 包在 IIFE 内、只暴露 window.BambooVolunteer.init/destroy；
-   身份切换的四个链接集中在 CONFIG.identities 一处，合并时替换为内部路由。
-6. 竹子 / 竹叶装饰（全部是内联 SVG，不加载任何图片）：
-   · leafIco()：标题前的胖竹叶；
-   · bambooMascot()：首页与「我的」空状态的胖竹盆栽（花盆笑脸，无圆点装饰）；
-   · bambooDivider()：小标题之间的胖竹枝分隔线；
-   · bambooOutline()：贯穿整页的背景竹林线稿（在 init 注入 #volGrove，
-     颜色/浓淡改 .vol-grove svg 的 opacity，默认 .26，想更明显可调到 .3）；
-   · bambooSprigOutline()：明信片页头、我的资料卡右上角的小竹枝线稿。
-   想改大小就改 .vol-hero-mascot / .vol-empty-mascot / .vol-leaf /
-   .vol-bamboo-sprig 的 width；想完全去掉，删掉对应调用即可。
-7. 我的页「徽章 + 竹子成长」：
-   · 可见文案统一用「竹粒」，数据键仍然是 zhuli（四端数据结构不变）；
-   · 徽章门槛在 CONFIG.badgeRules 的 n（10/30/60 竹粒），title 是格言：
-     铜牌=竹你快乐、银牌=竹事顺利、金牌=节节高；
-     未达标自动灰色，达标自动彩色（无需手动开关）；
-   · 徽章原图（图片1-3）已抠图并填入 CONFIG.badgeImages.bronze/silver/gold，
-     对应铜=竹你快乐、银=竹事顺利、金=节节高；换图时替换对应 data URI 即可；
-     徽章行里的 .vol-badge-pic 宽 96px，未解锁时自动加灰度滤镜；
-   · 每 3 竹粒长 1 节（CONFIG.zhuliPerNode），12 节/根、12 根/片
-     （CONFIG.stalkSegments / groveStalks）；groveArt() 生成整片竹林；
-     144 节（432 竹粒）= 12×12 长满，之后「切换竹林」按钮可用，
-     S.groveView 记录当前查看的片，可在已完成/新竹林之间循环切换；
-   · IP 图（图片4）已抠图（只留竹小节和熊猫），内联进 CONFIG.ipImage；
-     场景里 .vol-ip 固定在右下角，宽 136px，与竹竿保持距离；
-     右下角「竹小节 IP」角标会盖住原图水印。
-8. 四端显示名（本次只改显示文字）：
-   竹小节 · 采集 / 竹语 · 读屏收听 / 竹影 · 大字高对比 / 竹卫 · 审核；
-   对应 CONFIG.identities 的 label，key 与 href 保持原样
-   （./volunteer.html、./blind.html、./lowvis.html、./review.html）。
-====================================================================
--->
 </body>
 </html>

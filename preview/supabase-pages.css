@@ -1,0 +1,39 @@
+#page-account {
+  margin: 1rem auto;
+  max-width: min(42rem, calc(100% - 2rem));
+  padding: 1rem;
+}
+#page-account form {
+  display: grid;
+  gap: .75rem;
+}
+#page-account label,
+#page-account input {
+  display: block;
+  width: 100%;
+}
+#page-account input {
+  box-sizing: border-box;
+  font: inherit;
+  padding: .65rem;
+  border: 1px solid #657c6a;
+  border-radius: .4rem;
+  margin-top: .3rem;
+  color: #152a1b;
+  background: #fff;
+}
+.page-account-actions,
+.page-account-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+#page-account [role="status"]:empty { display: none; }
+.page-public-routes { margin: 0 0 1rem; }
+#page-account [hidden],
+#volMain[hidden],
+.vol-tabbar[hidden],
+#rev-main[hidden],
+#rev-bottomnav[hidden] {
+  display: none;
+}

@@ -514,9 +514,9 @@ img{max-width:100%;height:auto}
   }
 }
 </style>
+<link rel="stylesheet" href="./supabase-pages.css">
 </head>
 <body>
-<div role="note" style="position:relative;z-index:9999;padding:14px 18px;background:#fff1bf;color:#342800;font:600 16px/1.6 system-ui,sans-serif;border-bottom:2px solid #a47800">新版界面预览：当前路标、投稿和审核只保存在本机浏览器，未接入云端，请勿用于实际出行或正式投稿。<a href="../index.html" style="color:#173e2b;text-decoration:underline;margin-left:8px">返回云端正式版</a></div>
 <div id="view-rev" class="view">
 
   <!-- 背景竹林：线稿，只做装饰（竹节几何 + 低透明度） -->
@@ -593,7 +593,21 @@ img{max-width:100%;height:auto}
   <!-- 👉 要插图就去掉下行注释，换成你的图片文件名 -->
   <!-- <img src="你的图片.jpg" alt="图片说明" style="width:100%"> -->
 
-  <main class="rev-main" id="rev-main">
+  <section id="page-account" class="page-account rev-card" aria-label="帮步账号">
+  <form hidden>
+    <h2>管理员登录</h2>
+    <label>邮箱 <input type="email" name="email" autocomplete="email" maxlength="254" required></label>
+    <label>密码 <input type="password" name="password" autocomplete="current-password" minlength="6" required></label>
+    <div class="page-account-actions"><button class="rev-btn rev-btn-primary" type="submit" value="login">登录</button>
+    </div>
+  </form>
+  <div class="page-account-controls" hidden>
+    <button class="rev-btn" type="button" data-refresh>刷新路标</button>
+    <button class="rev-btn" type="button" data-sign-out>退出登录</button>
+  </div>
+  <p role="status">正在恢复登录状态…</p>
+</section>
+  <main class="rev-main" id="rev-main" hidden>
 
     <!-- ===================== 待办队列 ===================== -->
     <section id="rev-page-queue" class="rev-page" aria-labelledby="rev-queue-title">
@@ -609,10 +623,6 @@ img{max-width:100%;height:auto}
           <div class="rev-stat" role="listitem">
             <p class="rev-stat-label"><span aria-hidden="true">✅</span>今日已处理</p>
             <p class="rev-stat-value"><span id="rev-stat-today">0</span><span class="rev-stat-unit">条</span></p>
-          </div>
-          <div class="rev-stat" role="listitem">
-            <p class="rev-stat-label"><span aria-hidden="true">↩</span>退回待修改</p>
-            <p class="rev-stat-value"><span id="rev-stat-returned">0</span><span class="rev-stat-unit">条</span></p>
           </div>
           <div class="rev-stat" role="listitem">
             <p class="rev-stat-label"><span aria-hidden="true">❌</span>已驳回</p>
@@ -633,20 +643,11 @@ img{max-width:100%;height:auto}
           </div>
           <div class="rev-filter-row">
             <div class="rev-field">
-              <label class="rev-label" for="rev-risk">风险标签</label>
-              <select class="rev-select" id="rev-risk">
-                <option value="all">全部</option>
-                <option value="conflict">描述矛盾类</option>
-                <option value="short">录音过短</option>
-                <option value="privacy">疑似含隐私</option>
-                <option value="inaccurate">视障用户反馈不准</option>
-              </select>
-            </div>
-            <div class="rev-field">
               <label class="rev-label" for="rev-blind">盲道状态</label>
               <select class="rev-select" id="rev-blind">
                 <option value="all">全部</option>
                 <option value="畅通">畅通</option>
+                <option value="已清理">已清理</option>
                 <option value="部分破损">部分破损</option>
                 <option value="被占用">被占用</option>
                 <option value="未知">未知</option>
@@ -680,7 +681,6 @@ img{max-width:100%;height:auto}
             <select class="rev-select" id="rev-records-status">
               <option value="all">全部</option>
               <option value="approved">通过</option>
-              <option value="returned">退回</option>
               <option value="rejected">驳回</option>
             </select>
           </div>
@@ -757,7 +757,7 @@ img{max-width:100%;height:auto}
   </main>
 
   <!-- 区域 5 · 底部导航 -->
-  <nav class="rev-bottomnav" id="rev-bottomnav" aria-label="竹卫主导航">
+  <nav class="rev-bottomnav" id="rev-bottomnav" hidden aria-label="竹卫主导航">
     <div class="rev-bottomnav-inner">
       <button type="button" class="rev-nav-btn" data-tab="queue" aria-current="page">
         <span class="rev-nav-icon" aria-hidden="true">📥</span><span>待办队列</span>
@@ -807,6 +807,9 @@ img{max-width:100%;height:auto}
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+<script src="../cloud.js"></script>
+<script src="./supabase-pages.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -814,15 +817,14 @@ img{max-width:100%;height:auto}
 /* ===== 👉 【文字配置区】在这里改文字 ===== */
 const CONFIG={
   appTitle:'帮步 Bamboo · 竹卫',
-  apiBase:'local',            // ← 第1问答案写这里：'local' 或服务器地址（当前 local）
   reviewerName:'审核员R01',
   returnTags:['录音听不清','地点描述不具体','描述与图片不一致',
               '盲道状态与描述不符','疑似含隐私（人脸、车牌、门牌）',
               '内容与路况无关'],
-  tipQueue:'仅 AI 识别存疑的路标流入人工队列；大部分路标由 AI 直接放行',
+  tipQueue:'待审路标只有通过人工审核后才会公开。',
   tipPrivacy:'隐私提醒：发现人脸、车牌、门牌等隐私信息请直接驳回',
   tipReadonly:'素材只读：你不能修改志愿者原始录音与图片，有问题请退回重录',
-  emptyQueue:'当前没有待审核任务，所有路标已由 AI 处理完成',
+  emptyQueue:'当前没有待审核路标。',
   returnNoteRequired:'退回必须填写修改建议',
   // 审核勋章：累计审核 10 / 30 / 60 条，对应铜·银·金牌（图片已抠图内联，未解锁自动灰度）
   medalRules:[
@@ -852,124 +854,10 @@ const PAGE_SIZE=CONFIG.pageSize;
 /* ============================================================
    公共契约 4.3：统一数据层（逐字保留，函数名与行为不得改动）
    ============================================================ */
-const BambooDB=(()=>{
-  const LS='app_bamboo_marks', DBN='app_bamboo_media';
-  const API={ base:'local', setBase(b){this.base=b;} };
-  function load(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return[]}}
-  function persist(l){localStorage.setItem(LS,JSON.stringify(l))}
-  function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);
-    r.onupgradeneeded=()=>r.result.createObjectStore('media');
-    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);})}
-  async function putMedia(key,blob){const db=await idb();
-    return new Promise((res,rej)=>{const tx=db.transaction('media','readwrite');
-      tx.objectStore('media').put(blob,key); tx.oncomplete=()=>res(key);
-      tx.onerror=()=>rej(tx.error);})}
-  async function getMedia(key){const db=await idb();
-    return new Promise((res,rej)=>{const tx=db.transaction('media','readonly');
-      const rq=tx.objectStore('media').get(key);
-      rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);})}
-  function aiReview(m){
-    const flags=[];
-    if(!m.audio||!m.audio.duration||m.audio.duration<20)flags.push('录音时长不足');
-    if(m.blindPath&&m.blindPath.status==='未知')flags.push('盲道状态模糊');
-    if(!m.place||m.place.length<2)flags.push('点位名称不完整');
-    if(!m.audio||!m.audio.duration)flags.push('文字替代录音');
-    return{verdict:flags.length?'unsure':'pass',flags};
-  }
-  async function saveMark(m){
-    m.aiReview=aiReview(m);
-    m.state=m.aiReview.verdict==='pass'?'published':'queue';
-    m.humanReview={status:null,reviewer:null,tags:[],note:null,reviewedAt:null};
-    const l=load();const i=l.findIndex(x=>x.id===m.id);
-    if(i>-1){l[i]=m}else{m.usage=m.usage||{listens:0,confirm:0,inaccurate:0};l.unshift(m)}
-    persist(l);return m;
-  }
-  async function updateMark(id,patch){const l=load();const m=l.find(x=>x.id===id);
-    if(m){Object.assign(m,patch);persist(l)}return m}
-  async function listMarks(f){let l=load();
-    if(f&&f.state)l=l.filter(m=>m.state===f.state);return l}
-  async function markInaccurate(id){const l=load();const m=l.find(x=>x.id===id);
-    if(m&&m.state==='published'){m.usage.inaccurate++;
-      m.aiReview.flags=['视障用户反馈不准'];m.state='queue';persist(l)}return m}
-  return{API,load,persist,listMarks,saveMark,updateMark,markInaccurate,putMedia,getMedia};
-})();
-// 服务器模式预留：API.base 非 'local' 时改走 fetch，原型阶段仅写 TODO 注释。
-BambooDB.API.setBase(CONFIG.apiBase);
-/* TODO（服务器模式，原型不实现）：当 CONFIG.apiBase !== 'local' 时，
-   load/persist/updateMark 等改走 fetch(`${API.base}/marks`) 标准 REST 接口，
-   返回结构保持与本文件一致；登录凭证同样在这一层统一附加。 */
+const BambooDB = routePageStore("review");
 
-/* ============================================================
-   公共契约 4.4：种子数据（首次打开写入，四端完全相同）
-   ============================================================ */
-function seedIfNeeded(){
-  if(localStorage.getItem('app_bamboo_marks'))return;
-  const now=Date.now(),D=86400000;
-  const seeds=[
-   {id:'BM0001',place:'地铁2号线C口无障碍电梯',lat:31.2323,lng:121.4691,
-    submittedAt:now-3*D,vol:{anonId:'竹小节A1024',zhuli:36},
-    audio:{mediaKey:null,duration:42,aiText:'电梯在C口右手边约五米，入口有触觉提示砖，轿厢语音报层清晰，出电梯右转即是盲道。'},
-    photo:{mediaKey:null,aiText:'垂直电梯一部，门框有黄色提示条'},
-    blindPath:{status:'畅通',checkedAt:now-3*D},
-    aiReview:{verdict:'pass',flags:[]},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:12,confirm:5,inaccurate:0},state:'published'},
-   {id:'BM0002',place:'人民广场东南角盲道',lat:31.2304,lng:121.4737,
-    submittedAt:now-2*D,vol:{anonId:'竹小节B2077',zhuli:18},
-    audio:{mediaKey:null,duration:35,aiText:'东南角共享单车常压占盲道约十米，绕行请靠右侧花坛边缘。'},
-    photo:{mediaKey:null,aiText:'盲道上停有多辆共享单车'},
-    blindPath:{status:'被占用',checkedAt:now-2*D},
-    aiReview:{verdict:'pass',flags:[]},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:8,confirm:2,inaccurate:0},state:'published'},
-   {id:'BM0003',place:'天桥下中山北路口',lat:31.2341,lng:121.4712,
-    submittedAt:now-1*D,vol:{anonId:'竹小节A1024',zhuli:36},
-    audio:{mediaKey:null,duration:12,aiText:'路口……（此处录音过短）'},
-    photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-1*D},
-    aiReview:{verdict:'unsure',flags:['录音时长不足']},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
-   {id:'BM0004',place:'公交17路站台',lat:31.2287,lng:121.4750,
-    submittedAt:now-1*D,vol:{anonId:'竹小节B2077',zhuli:18},
-    audio:{mediaKey:null,duration:28,aiText:'站台有无障碍坡道，候车椅在头节车厢对应位置。'},
-    photo:{mediaKey:null,aiText:'站台照壁为广告灯箱'},
-    blindPath:{status:'部分破损',checkedAt:now-1*D},
-    aiReview:{verdict:'unsure',flags:['描述与图片不一致']},
-    humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
-   {id:'BM0005',place:'医院北门坡道',lat:31.2350,lng:121.4668,
-    submittedAt:now-5*D,vol:{anonId:'竹小节A1024',zhuli:36},
-    audio:{mediaKey:null,duration:22,aiText:'北门坡道较陡，两侧有双层扶手。'},
-    photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-5*D},
-    aiReview:{verdict:'unsure',flags:['录音时长不足']},
-    humanReview:{status:'returned',reviewer:'审核员R01',
-      tags:['录音听不清'],note:'风声盖过人声，请靠近话筒或到避风处重录。',
-      reviewedAt:now-4*D},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'returned'},
-   {id:'BM0006',place:'学校东门',lat:31.2295,lng:121.4680,
-    submittedAt:now-6*D,vol:{anonId:'竹小节B2077',zhuli:18},
-    audio:{mediaKey:null,duration:31,aiText:'东门放学时段人流量大，门内左侧有休息座椅。'},
-    photo:{mediaKey:null,aiText:'画面中有多名学生人脸'},
-    blindPath:{status:'未知',checkedAt:now-6*D},
-    aiReview:{verdict:'unsure',flags:['疑似含隐私']},
-    humanReview:{status:'rejected',reviewer:'审核员R01',
-      tags:['疑似含隐私'],note:'画面含学生人脸，请重新拍摄避开人脸。',
-      reviewedAt:now-6*D},
-    usage:{listens:0,confirm:0,inaccurate:0},state:'rejected'}
-  ];
-  localStorage.setItem('app_bamboo_marks',JSON.stringify(seeds));
-}
-seedIfNeeded();
-// 种子条目 mediaKey 为 null：录音播放显示「演示数据 · 原声占位」并用
-// speechSynthesis 朗读 aiText 代替；照片显示占位色块+「演示图片」。
-
-/* ============================================================
-   以下为本端（审核者）UI 层。数据读写一律走 BambooDB，
-   不直接改 volunteers 的原始素材字段（录音/文字/图片）。
-   ============================================================ */
-
-/* ---------- 常量表 ---------- */
 const BLIND={
+  '已清理':{icon:'✔',cls:'rev-ok'},
   '畅通':{icon:'✔',cls:'rev-ok'},
   '部分破损':{icon:'▲',cls:'rev-warn'},
   '被占用':{icon:'⛔',cls:'rev-warn'},
@@ -1031,7 +919,7 @@ function fmtShort(ts){
     return (d.getMonth()+1)+'月'+d.getDate()+'日 '+pad2(d.getHours())+':'+pad2(d.getMinutes());
   return fmtFull(ts);
 }
-function flagsOf(m){return (m&&m.aiReview&&Array.isArray(m.aiReview.flags))?m.aiReview.flags:[];}
+function flagsOf(m){ return []; }
 function announce(msg){
   if(!els.live)return;
   els.live.textContent='';
@@ -1072,14 +960,13 @@ function filteredQueue(){
   const q=state.q.trim().toLowerCase();
   return sortedQueue().filter(m=>{
     if(q&&String(m.place||'').toLowerCase().indexOf(q)<0)return false;
-    if(state.risk!=='all'&&!(RISK[state.risk]||RISK.all).test(flagsOf(m)))return false;
     if(state.blind!=='all'&&((m.blindPath&&m.blindPath.status)||'未知')!==state.blind)return false;
     return true;
   });
 }
 function recordsOf(){
   return BambooDB.load()
-    .filter(m=>m&&m.humanReview&&m.humanReview.status&&m.humanReview.reviewer===settings.reviewerName)
+    .filter(m=>m.humanReview?.status)
     .sort((a,b)=>(b.humanReview.reviewedAt||0)-(a.humanReview.reviewedAt||0));
 }
 
@@ -1158,7 +1045,6 @@ function taskCardHTML(m){
   const bm=BLIND[blind]||BLIND['未知'];
   const text=(m.audio&&m.audio.aiText)||'';
   const preview=text.length>40?text.slice(0,40)+'…':text;
-  const confirm=(m.usage&&m.usage.confirm)||0;
   const anon=(m.vol&&m.vol.anonId)||'—';
   return ''
   +'<article class="rev-card rev-task" aria-labelledby="rev-task-h-'+esc(m.id)+'">'
@@ -1173,10 +1059,9 @@ function taskCardHTML(m){
       +'<span class="rev-blind '+bm.cls+'"><span aria-hidden="true">'+bm.icon+'</span>盲道：'+esc(blind)+'</span>'
       +'<span>提交：'+esc(fmtShort(m.submittedAt))+'</span>'
       +'<span>志愿者：'+esc(anon)+'</span>'
-      +'<span>已有 '+confirm+' 位视障用户验收</span>'
     +'</p>'
-    +'<p class="rev-preview"><span class="rev-preview-label">AI 转写预览</span>'
-      +(text?'“'+esc(preview)+'”':'（暂无转写文本）')+'</p>'
+    +'<p class="rev-preview"><span class="rev-preview-label">路标描述</span>'
+      +(text?'“'+esc(preview)+'”':'（暂无文字描述）')+'</p>'
     +'<button type="button" class="rev-btn rev-btn-primary rev-btn-block" '
       +'data-act="open" data-id="'+esc(m.id)+'" aria-label="去审核：'+esc(m.place)+'">去审核</button>'
   +'</article>';
@@ -1213,9 +1098,6 @@ function renderList(){
 function recordHTML(m){
   const hr=m.humanReview;
   const meta=STATUS[hr.status]||STATUS.approved;
-  const tags=(hr.tags&&hr.tags.length)
-    ?hr.tags.map(t=>'<span class="rev-tag-pill">'+esc(t)+'</span>').join('')
-    :'（无）';
   return ''
   +'<article class="rev-card rev-record">'
     +'<div class="rev-record-top">'
@@ -1223,16 +1105,13 @@ function recordHTML(m){
       +'<p class="rev-badge '+meta.cls+'"><span aria-hidden="true">'+meta.icon+'</span>'+meta.text+'</p>'
     +'</div>'
     +'<p class="rev-record-row"><b>处理时间：</b>'+esc(fmtFull(hr.reviewedAt))+'</p>'
-    +'<p class="rev-record-row"><b>审核人：</b>'+esc(hr.reviewer)+'</p>'
-    +'<p class="rev-record-row"><b>标签：</b>'+tags+'</p>'
-    +'<p class="rev-record-row"><b>备注：</b>'+(hr.note?esc(hr.note):'（无）')+'</p>'
   +'</article>';
 }
 function renderRecords(){
   if(!els.recordsList)return;
   const all=recordsOf();
   const list=state.recordsStatus==='all'?all:all.filter(m=>m.humanReview.status===state.recordsStatus);
-  els.recordsWho.textContent='只显示审核人 = 「'+settings.reviewerName+'」的记录；仅回溯查看，不提供二次修改。';
+  els.recordsWho.textContent='显示最近的云端审核记录。';
   els.recordsCount.textContent='共 '+list.length+' 条审核记录';
   if(!list.length){
     els.recordsList.innerHTML='';
@@ -1248,9 +1127,7 @@ function renderRecords(){
 function renderMe(){
   if(els.meName&&document.activeElement!==els.meName)els.meName.value=settings.reviewerName;
   if(els.meStorage){
-    els.meStorage.textContent='数据模式：'+CONFIG.apiBase
-      +'（数据存在本机浏览器 localStorage / IndexedDB）· 后端技术计划：'+CONFIG.backendPlan
-      +'。本端不写入任何志愿者的原始素材字段。';
+    els.meStorage.textContent='审核结果保存在云端。';
   }
   setSwitch(els.meLarge,settings.large);
 }
@@ -1334,7 +1211,6 @@ function detailHTML(m){
   const bm=BLIND[blind]||BLIND['未知'];
   const aud=m.audio||{};
   const ph=m.photo||null;
-  const u=m.usage||{};
   const hasPhoto=!!(ph&&(ph.aiText||ph.mediaKey));
   const photoBlock=hasPhoto
     ?'<button type="button" class="rev-photo-btn" data-act="zoom" aria-label="放大查看该路标的照片">'
@@ -1344,9 +1220,6 @@ function detailHTML(m){
       +'<span class="rev-photo-cap">点击放大查看</span>'
      +'</button>'
     :'<p class="rev-none">志愿者未上传照片</p>';
-  const chips=CONFIG.returnTags.map(t=>
-    '<label class="rev-chip"><input type="checkbox" name="rev-tag" value="'+esc(t)+'"><span>'+esc(t)+'</span></label>'
-  ).join('');
 
   return ''
   +'<button type="button" class="rev-btn rev-btn-ghost rev-back" data-act="back">← 返回列表</button>'
@@ -1356,7 +1229,7 @@ function detailHTML(m){
       ?'<ul class="rev-risk" aria-label="风险标签">'
         +flags.map(f=>'<li class="rev-risk-item"><span aria-hidden="true">⚠</span>'+esc(f)+'</li>').join('')
         +'</ul>'
-      :'<p class="rev-hint">AI 未标注具体风险项</p>')
+      :'')
   +'</div>'
   +'<p class="rev-lock"><span aria-hidden="true">🔒</span><span>素材只读，审核者不可修改原始内容</span></p>'
 
@@ -1364,14 +1237,12 @@ function detailHTML(m){
     +'<h3 class="rev-sec-title" id="rev-sec-info">点位信息</h3>'
     +'<dl class="rev-dl">'
       +'<div class="rev-dl-row"><dt>点位名</dt><dd>'+esc(m.place)+'</dd></div>'
-      +'<div class="rev-dl-row"><dt>坐标</dt><dd>'+esc(m.lat)+', '+esc(m.lng)+'</dd></div>'
+      +'<div class="rev-dl-row"><dt>坐标</dt><dd>'+(m.lat==null?'未提供':esc(m.lat)+', '+esc(m.lng))+'</dd></div>'
       +'<div class="rev-dl-row"><dt>提交时间</dt><dd>'+esc(fmtFull(m.submittedAt))+'</dd></div>'
       +'<div class="rev-dl-row"><dt>志愿者匿名ID</dt><dd>'+esc((m.vol&&m.vol.anonId)||'—')
-        +'（助力值 '+esc((m.vol&&m.vol.zhuli)||0)+'）</dd></div>'
+        +'</dd></div>'
       +'<div class="rev-dl-row"><dt>盲道上报</dt><dd><span class="rev-blind '+bm.cls
         +'"><span aria-hidden="true">'+bm.icon+'</span>'+esc(blind)+'</span></dd></div>'
-      +'<div class="rev-dl-row"><dt>视障用户反馈</dt><dd>已有 '+esc(u.confirm||0)+' 位验收 · '
-        +esc(u.inaccurate||0)+' 人标记不准</dd></div>'
     +'</dl>'
   +'</section>'
 
@@ -1379,7 +1250,7 @@ function detailHTML(m){
     +'<h3 class="rev-sec-title" id="rev-sec-audio">志愿者原声</h3>'
     +'<div class="rev-audio">'
       +'<button type="button" class="rev-btn rev-btn-primary rev-audio-btn" id="rev-audio-btn" '
-        +'data-act="audio" aria-label="播放录音">▶ 播放</button>'
+        + 'data-act="audio" disabled aria-label="播放录音">▶ 播放</button>'
       +'<div class="rev-audio-main">'
         +'<progress id="rev-audio-prog" class="rev-progress" max="100" value="0" aria-label="录音播放进度"></progress>'
         +'<p class="rev-audio-time" id="rev-audio-time">00:00 / '+esc(fmtClock(aud.duration||0))+'</p>'
@@ -1387,43 +1258,28 @@ function detailHTML(m){
     +'</div>'
     +'<p class="rev-audio-mode rev-hint" id="rev-audio-mode">'
       +(aud.mediaKey?'原声音频（只读，可播放）'
-        :'演示数据 · 原声占位：用系统语音朗读下方 AI 转写代替原声')+'</p>'
-    +'<h4 class="rev-sub-title">AI 转写（只读）</h4>'
-    +'<p class="rev-readonly-text">'+(aud.aiText?esc(aud.aiText):'（无 AI 转写文本）')+'</p>'
+        :'录音暂不可用')+'</p>'
+    +'<h4 class="rev-sub-title">路标文字描述</h4>'
+    +'<p class="rev-readonly-text">'+(aud.aiText?esc(aud.aiText):'（无文字描述）')+'</p>'
   +'</section>'
 
   +'<section class="rev-card" aria-labelledby="rev-sec-photo">'
-    +'<h3 class="rev-sec-title" id="rev-sec-photo">照片与识图解析</h3>'
+    +'<h3 class="rev-sec-title" id="rev-sec-photo">现场照片</h3>'
     +photoBlock
-    +'<h4 class="rev-sub-title">识图 AI 解析（只读）</h4>'
-    +'<p class="rev-readonly-text">'+((ph&&ph.aiText)?esc(ph.aiText):'（无识图解析文本）')+'</p>'
+    +(m.beforePhoto?'<button type="button" class="rev-btn" data-act="zoom-before">查看清理前照片</button>':'')
   +'</section>'
 
-  +'<p class="rev-compare">🔍 请对比：口述内容 ↔ 照片 ↔ AI 解析，判断信息是否冲突</p>'
+  +'<p class="rev-compare">🔍 请检查录音、文字和照片中的路况信息以及隐私内容。</p>'
 
   +'<form class="rev-card rev-review" id="rev-form" novalidate aria-labelledby="rev-sec-review">'
     +'<h3 class="rev-sec-title" id="rev-sec-review">审核操作</h3>'
     +'<fieldset class="rev-fieldset">'
-      +'<legend class="rev-legend">审核结论（三选一，必选）</legend>'
+      +'<legend class="rev-legend">审核结论（必选）</legend>'
       +'<div class="rev-choices">'
         +choiceHTML('approve','approved','✅','通过','信息可信，直接发布给视障使用者')
-        +choiceHTML('returned','returned','↩','退回','需要志愿者修改或重录，改完重新进队列')
         +choiceHTML('rejected','rejected','❌','驳回','留档不展示；原始素材仍保留备查')
       +'</div>'
     +'</fieldset>'
-
-    +'<fieldset class="rev-fieldset">'
-      +'<legend class="rev-legend">预设标签（可多选）</legend>'
-      +'<div class="rev-chips">'+chips+'</div>'
-      +'<p class="rev-hint" style="margin-top:6px">退回、驳回至少选一个标签；通过选填。</p>'
-    +'</fieldset>'
-
-    +'<div class="rev-field">'
-      +'<label class="rev-label" for="rev-note">备注 / 修改建议</label>'
-      +'<textarea class="rev-textarea" id="rev-note" rows="4" '
-        +'placeholder="写清问题所在与修改方向，志愿者端会看到这段话"></textarea>'
-      +'<p class="rev-hint" id="rev-note-hint">选「退回」时必填；通过、驳回选填。</p>'
-    +'</div>'
 
     +'<button type="submit" class="rev-btn rev-btn-primary rev-btn-block rev-submit" id="rev-submit" '
       +'disabled aria-disabled="true" aria-describedby="rev-submit-hint">提交审核结果</button>'
@@ -1478,17 +1334,9 @@ function readForm(){
 }
 
 function validate(sel){
-  if(!sel.status)return {ok:false,msg:'请先选择一种审核结论（通过 / 退回 / 驳回），选定后才能提交。'};
-  if(sel.status==='returned'){
-    if(!sel.tags.length)return {ok:false,msg:'退回必须选择至少一个预设标签。'};
-    if(!sel.note)return {ok:false,msg:CONFIG.returnNoteRequired};
-  }
-  if(sel.status==='rejected'&&!sel.tags.length){
-    return {ok:false,msg:'驳回必须选择至少一个预设标签。'};
-  }
-  return {ok:true,msg:''};
+  return ['approved','rejected'].includes(sel.status)
+    ? {ok:true} : {ok:false,msg:'请选择通过或驳回。'};
 }
-
 function refreshSubmit(){
   const sel=readForm();
   const v=validate(sel);
@@ -1557,7 +1405,7 @@ function startTick(){
 }
 function playAudio(){
   if(A.playing)return;
-  if(!A.total){
+  if(!A.total && !A.el){
     announce('该条目没有可播放的录音时长');
     return;
   }
@@ -1576,7 +1424,6 @@ function playAudio(){
   if('speechSynthesis' in window&&text){
     try{
       window.speechSynthesis.cancel();
-      const u=new SpeechSynthesisUtterance(text);
       u.lang='zh-CN';u.rate=1;u.pitch=1;
       u.onend=()=>{if(A.playing)finishAudio();};
       A.utter=u;
@@ -1609,12 +1456,16 @@ async function prepareAudio(m){
       if(blob&&blob.size!==undefined){
         const url=URL.createObjectURL(blob);
         const el=new Audio(url);
+        el.addEventListener('loadedmetadata',()=>{
+          if(token===A.token && Number.isFinite(el.duration)){ A.total=Math.ceil(el.duration); updateAudioUI(); }
+        });
         el.addEventListener('ended',()=>{if(token===A.token)finishAudio();});
         A.url=url;A.el=el;A.mode='media';
       }
     }catch(e){A.mode='demo';}
   }
-  if(!A.total){const btn=$('rev-audio-btn');if(btn){btn.disabled=true;btn.textContent='无录音';}}
+  const button=$('rev-audio-btn');
+  if(button){ button.disabled=!A.el; if(!A.el) button.textContent='录音暂不可用'; }
   updateAudioUI();
 }
 
@@ -1631,17 +1482,16 @@ function closeDialog(dlg){
   if(typeof dlg.close==='function'){try{dlg.close();}catch(e){}}
   dlg.removeAttribute('open');
 }
-function openImage(){
+function openImage(before=false){
   const m=BambooDB.load().find(x=>x.id===state.detailId);
   if(!m||!els.imageDialog)return;
-  const ph=m.photo||{};
+  const ph=before?{mediaKey:m.beforePhoto}:m.photo||{};
   const body=els.imageBody;
-  els.imageCaption.textContent=(ph.aiText?'识图 AI 解析：'+ph.aiText:'（无识图解析文本）')
-    +(ph.mediaKey?'':'　· 演示占位，志愿者未上传原图');
+  els.imageCaption.textContent=before ? '清理前现场照片' : '志愿者上传的现场照片';
   if(ph.mediaKey){
     body.innerHTML='<p class="rev-hint">图片加载中…</p>';
     BambooDB.getMedia(ph.mediaKey).then(blob=>{
-      if(!blob){body.innerHTML='<p class="rev-hint">未找到原图（可能已在本机清除）。</p>';return;}
+      if(!blob){body.innerHTML='<p class="rev-hint">暂时无法读取原图。</p>';return;}
       const url=URL.createObjectURL(blob);
       body.innerHTML='';
       const img=document.createElement('img');
@@ -1670,7 +1520,9 @@ function computeNext(){
   }
   return ids.length?ids[0]:null;
 }
-function handleSubmit(){
+let savingReview = false;
+async function handleSubmit(){
+  if(savingReview) return;
   const sel=readForm();
   const v=validate(sel);
   const hint=$('rev-submit-hint');
@@ -1686,16 +1538,30 @@ function handleSubmit(){
     goList(true);
     return;
   }
-  const nextState=sel.status==='approved'?'published':(sel.status==='returned'?'returned':'rejected');
-  const hr={
-    status:sel.status,
-    reviewer:settings.reviewerName,
-    tags:sel.tags.slice(),
-    note:sel.note?sel.note:null,
-    reviewedAt:Date.now()
-  };
   const beforeCount=reviewedCount();
-  BambooDB.updateMark(id,{state:nextState,humanReview:hr});
+  const button=$('rev-submit');
+  savingReview=true;
+  button.disabled=true;
+  if(hint) hint.textContent='正在保存审核结果…';
+  try{
+    const changed=await BambooDB.decide(id,sel.status);
+    if(!changed){
+      await BambooDB.refresh();
+      goList(true);
+      announce('这条路标已被处理，请查看最新列表。');
+      return;
+    }
+  }catch(error){
+    console.warn('Could not save review',error);
+    const message=error.code==='23514' ? '素材缺失，无法通过审核。' : '审核结果未保存，请重试。';
+    if(hint) hint.textContent=message;
+    announce(message);
+    return;
+  }finally{
+    savingReview=false;
+    button.disabled=false;
+  }
+  if(!cloudSession || state.detailId!==id) return;
   const gained=gainedMedals(beforeCount,reviewedCount());
 
   const gainedText=gained.length
@@ -1886,7 +1752,7 @@ function bindEvents(){
     }
     settings.reviewerName=name;
     saveSettings();
-    if(els.meMsg)els.meMsg.textContent='已保存：审核记录将按「'+name+'」筛选。';
+    if(els.meMsg)els.meMsg.textContent='已保存：当前显示称呼为「'+name+'」。';
     renderRecords();
     announce('已保存审核员称呼：'+name);
   });
@@ -1903,7 +1769,7 @@ function bindEvents(){
     const act=btn.dataset.act;
     if(act==='back')goList(true);
     else if(act==='audio')toggleAudio();
-    else if(act==='zoom')openImage();
+    else if(act==='zoom'||act==='zoom-before')openImage(act==='zoom-before');
   });
   on(els.detailBody,'change',e=>{
     const t=e.target;
@@ -1979,6 +1845,16 @@ function init(){
   renderMedals();
 
   document.title=CONFIG.appTitle;
+  setupPageAccount({role:'review',store:BambooDB,content:[$('rev-main'),$('rev-bottomnav')],
+    render(){ goList(false); renderRecords(); renderMe(); },
+    onSessionEnd(){
+      stopAudio();
+      closeDialog(els.imageDialog);
+      closeDialog(els.nextDialog);
+      els.detailBody.textContent='';
+    },
+    canSignOut:()=>!savingReview
+  });
 }
 
 function destroy(){
@@ -1997,51 +1873,5 @@ window.BambooReview={init:init,destroy:destroy};
 init();
 })();
 </script>
-
-<!--
-===============================【修改说明】===============================
-1. 改文字：脚本最顶部 CONFIG 集中放全部文案——
-   标题 / 审核员称呼 / 预设标签清单 / 排队提示 / 隐私提醒 / 只读提醒 /
-   空状态文案 / 退回备注必填提示 / 勋章门槛与格言（medalRules）/
-   身份切换四链接（identities）。
-2. 数据源：CONFIG.apiBase 现为 'local'（本机浏览器 localStorage + IndexedDB）。
-   将来部署后填服务器地址即可；data 层里已留 fetch 的 TODO 注释。
-   第 1 问② 后端技术计划：还没定（只记录，前端按标准 REST 接口形状书写）。
-3. 改字号：只改 :root 的 --fs-title / --fs-sub / --fs-body / --fs-small / --btn-h；
-   放大模式档在 html.rv-large 里（30/26/22/18/64），已保证文字不小于 14px。
-4. 加插图：把页面里的注释模板换成自己的图片，例如
-   👉 <img src="你的图片.jpg" alt="图片说明" style="width:100%">
-   位置在顶栏下方，已留注释标记。
-5. 改主色/圆角：只改 :root 的 --rv-* 变量，不要新增非 rev- 前缀类名。
-6. 接后端：替换 BambooDB 里的 local 分支为 fetch，函数返回值结构保持不变；
-   本页只调用 load / listMarks / updateMark / getMedia / API.setBase。
-7. 并入四端：本文件只有 #view-rev 一个根容器，CSS 类名一律 rev- 前缀，
-   全部 JS 在 IIFE 内，仅暴露 window.BambooReview = { init, destroy }。
-   宿主页面切换路由时调用 init() 进入、destroy() 退出（停止播放、清理定时器）。
-8. 素材只读：本页没有任何修改/删除录音、转写、原图的入口；驳回条目
-   state='rejected' 仍保留在 app_bamboo_marks 里留档，仅从队列与前端列表隐藏。
-9. 数据键：本端读写 app_bamboo_marks，设置存 app_bamboo_settings；
-   app_bamboo_postcards / app_bamboo_profile 属志愿者端，本端不读不写。
-   「我的审核记录」从 marks 的 humanReview 里按 reviewer===当前审核员 筛选得出，不另存副本。
-10. 审核勋章：CONFIG.medalRules 定义门槛与格言（10 条=铜牌竹节·竹你快乐、
-    30 条=银牌竹节·竹事顺利、60 条=金牌竹节·节节高），达到即自动解锁；
-    计数=本审核人已处理条数（与「审核记录」同源），换称呼则从新称呼重新计。
-    未解锁显示灰度 50%，解锁恢复原色并加苔绿细边。
-    IP 角标写「竹小节 IP」（压在图右下角）；胖竹盆栽只用在队列空状态（全页仅一次）。
-11. 图片资产（全部内联 data URI，无外部文件）：
-    · 三枚奖牌用的是「已抠图」的原始 PNG（529×1016 / 492×946 / 529×999，
-      保留挂链与绶带，不裁切），只做等比缩放到 260px 宽；
-    · 原图右下角的「AI 生成」角标，用第 4 张素材（竹林里的小竹节与小笋）
-      抠成贴纸后盖住：贴纸按 HSV 饱和度抠图（纸纹不会被误留），并用药水
-      补掉它自己的 @ 水印；贴纸宽 104/300，紧贴奖牌右下角；
-    · IP 图：清掉脚下残留的地面阴影色块（按列羽化到透明），保留
-      「竹小节 IP」角贴；
-    · 背景竹林是内联 SVG 线稿（与志愿者端同一套轮廓，opacity .15），
-      fixed 贴住视口、只做装饰，不挡正文。
-    单文件体积约 260KB。
-12. 换图只改 CONFIG.medalImages.bronze/silver/gold、ipImage、potImage 的
-    data URI；贴纸与背景都在这一步之外，不需要动。
-=======================================================================
--->
 </body>
 </html>

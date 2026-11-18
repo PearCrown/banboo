@@ -71,7 +71,7 @@ async function submitCloudRoute(draft, recorder){
   const {data:existing,error:lookupError} = await bambooCloud.from('route_marks').select('id')
     .eq('submission_id',draft.submissionId).eq('owner_id',user.id).maybeSingle();
   if(lookupError) throw lookupError;
-  if(existing) return;
+  if(existing) return existing.id;
 
   const bucket = bambooCloud.storage.from(routeBucket);
   const files = {audio:draft.audio,before:draft.photos.before,after:draft.photos.after};
@@ -100,12 +100,20 @@ async function submitCloudRoute(draft, recorder){
     paths[kind] = upload.path;
   }
 
-  const {error} = await bambooCloud.from('route_marks').insert({
+  const {data,error} = await bambooCloud.from('route_marks').insert({
     submission_id:draft.submissionId, place:draft.place.trim(), summary:draft.summary.trim(), recorder,
     path_status:draft.path.status || 'unknown', audio_path:paths.audio,
-    before_path:paths.before ?? null, after_path:paths.after ?? null
-  });
-  if(error && error.code !== '23505') throw error;
+    before_path:paths.before ?? null, after_path:paths.after ?? null,
+    ...draft.capture
+  }).select('id').single();
+  if(error?.code === '23505'){
+    const {data:submitted,error:readError} = await bambooCloud.from('route_marks').select('id')
+      .eq('submission_id',draft.submissionId).eq('owner_id',user.id).single();
+    if(readError) throw readError;
+    return submitted.id;
+  }
+  if(error) throw error;
+  return data.id;
 }
 
 async function signRouteMedia(paths){

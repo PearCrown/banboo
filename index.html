@@ -65,6 +65,7 @@
     background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.35);
     border-radius:18px;padding:16px;margin-top:12px;color:#fff;cursor:pointer;
   }
+  .role-card{text-decoration:none}
   .role-card > span:last-child{flex:1;min-width:0}
   .role-card b{display:block;font-size:17px;overflow-wrap:anywhere}
   .role-card small{display:block;color:#DCE8DF;font-size:12px;line-height:1.5;margin-top:3px;overflow-wrap:anywhere}
@@ -469,24 +470,23 @@
     <p style="letter-spacing:.18em;font-size:11px;color:#BFD3C6;margin:8px 0 0">帮步 BAMBOO</p>
     <h1>你是？</h1>
     <p>选择身份，帮步会给你不同的界面。</p>
-    <button class="role-card" onclick="chooseRole('volunteer')">
+    <a class="role-card" href="preview/volunteer.html">
       <span class="role-ico">🎋</span>
       <span><b>竹小节（志愿者）</b><small>路过 30 秒，替视障伙伴看一眼</small></span>
-    </button>
-    <button class="role-card" onclick="chooseRole('blind')">
+    </a>
+    <a class="role-card" href="preview/blind.html">
       <span class="role-ico">🦯</span>
       <span><b>全盲</b><small>听附近的路标，语音与震动操作</small></span>
-    </button>
-    <button class="role-card" onclick="chooseRole('lowvision')">
+    </a>
+    <a class="role-card" href="preview/lowvis.html">
       <span class="role-ico">🔍</span>
       <span><b>半盲 / 低视力</b><small>大字、高对比、少干扰</small></span>
-    </button>
-    <button class="role-card" onclick="chooseRole('admin')">
+    </a>
+    <a class="role-card" href="preview/review.html">
       <span class="role-ico">✓</span>
       <span><b>管理员审核</b><small>登录后处理志愿者提交的路标</small></span>
-    </button>
-    <p class="role-note">可以随时在“我的”里切换身份。</p>
-    <p class="role-note"><a href="preview/volunteer.html" style="color:#fff;text-decoration:underline">查看新版页面预览</a><br>新版目前使用演示数据，云端功能请使用上方入口。</p>
+    </a>
+    <p class="role-note">可以随时通过「切换身份」打开其他页面。</p>
   </div>
 </div>
 
@@ -614,6 +614,7 @@ function pathInfo(m){
   const p = m.blindPath || {status:'unknown'};
   if(p.status === 'ok' || p.status === 'cleared') return {cls:'ok', text:'盲道：畅通', detail:`畅通 · ${p.at || '今天'} · ${p.checks || 1} 人检查`};
   if(p.status === 'blocked') return {cls:'warn', text:'盲道：被占', detail:`被占 · ${p.at || '今天'}`};
+  if(p.status === 'broken') return {cls:'warn', text:'盲道：部分破损', detail:'部分破损'};
   return {cls:'unknown', text:'盲道：未知', detail:'暂无盲道记录'};
 }
 function roleLabel(){
@@ -1741,7 +1742,7 @@ function voiceSearch(){
   saveState();
   await initCloud();
 
-  if(!state.role){ showGate(); return; }
+  if(!state.role || (!role && !location.hash)){ showGate(); return; }
   hideGate();
   applySettings();
   renderTabbar();

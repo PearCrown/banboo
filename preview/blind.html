@@ -307,9 +307,9 @@ img{max-width:100%;height:auto}
   }
 }
 </style>
+<link rel="stylesheet" href="./supabase-pages.css">
 </head>
 <body>
-<div role="note" style="position:relative;z-index:9999;padding:14px 18px;background:#fff1bf;color:#342800;font:600 16px/1.6 system-ui,sans-serif;border-bottom:2px solid #a47800">新版界面预览：当前路标、投稿和审核只保存在本机浏览器，未接入云端，请勿用于实际出行或正式投稿。<a href="../index.html" style="color:#173e2b;text-decoration:underline;margin-left:8px">返回云端正式版</a></div>
 
 <!-- 唯一根容器（四端合并时整体搬运；id 不可改） -->
 <div id="view-blind" class="view">
@@ -376,15 +376,11 @@ img{max-width:100%;height:auto}
     <!-- 路标列表 -->
     <section class="blind-list-wrap" aria-labelledby="blind-list-h">
       <h2 id="blind-list-h" class="blind-list-h" tabindex="-1">附近路标</h2>
-      <p id="blind-list-empty" class="blind-empty" tabindex="-1" hidden>附近暂时没有可以收听的已发布路标</p>
-      <ol id="blind-list" class="blind-list" role="list"></ol>
-    </section>
+      <p id="blind-list-empty" class="blind-empty" tabindex="-1" hidden>暂时没有可以收听的已发布路标</p>
 
-    <!-- 播放方式：演示数据和读屏抢声音时，一键改成「读屏念全文」 -->
-    <section class="blind-setting" aria-labelledby="blind-setting-h">
-      <h2 id="blind-setting-h" class="blind-setting-title">播放方式</h2>
-      <p class="blind-setting-text">演示路标没有真实录音。如果播放时和读屏叠在一起，就切到「读屏念全文」，全程只有读屏一个声音。</p>
-      <button id="blind-speak-mode" class="blind-btn blind-setting-btn" type="button">演示数据的播放方式：合成语音</button>
+    <div class="page-public-routes"><button id="published-refresh" class="blind-btn" type="button">刷新已审核路标</button>
+    <p id="published-status" role="status">正在读取已审核路标…</p></div>
+      <ol id="blind-list" class="blind-list" role="list"></ol>
     </section>
 
     <!-- 声音明信片：本端只放「即将上线」占位，不做功能 -->
@@ -399,11 +395,14 @@ img{max-width:100%;height:auto}
   </main>
 
   <footer class="blind-footer">
-    <p class="blind-footer-text">帮步 Bamboo · 竹语。本页数据保存在本机浏览器，不上传服务器。</p>
+    <p class="blind-footer-text">帮步 Bamboo · 竹语。只显示已通过人工审核的路标。</p>
   </footer>
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+<script src="../cloud.js"></script>
+<script src="./supabase-pages.js"></script>
 <script>
 (function () {
   'use strict';
@@ -411,7 +410,6 @@ img{max-width:100%;height:auto}
   /* ===== 👉 【文字配置区】在这里改文字（这些文字是读屏念给用户听的） ===== */
   const CONFIG={
     appTitle:'帮步 Bamboo · 竹语',
-    apiBase:'local',               // ← 第1问答案写这里（local=数据存在本机浏览器）
     locatedNear:'已定位到{place}，附近共{n}条路标',
     locateFail:'定位未开启，您可以语音说出地点',
     markSummary:'第{x}条，共{y}条：{place}，距离约{dist}，盲道{path}。内容：{text}',
@@ -459,7 +457,7 @@ img{max-width:100%;height:auto}
     coordPlace:'当前所在位置',
     playEnd:'播放结束',
     playFail:'这段原声暂时播放不了，请稍后再试，也可以先听摘要里的文字内容',
-    playMissing:'没有找到这段原声文件，改为朗读文字说明',
+    playMissing:'录音暂时无法播放，可以阅读路标的文字说明',
     ttsUnavailable:'当前设备无法朗读演示语音，请用读屏阅读摘要里的文字内容',
     textMissing:'这条路标暂时没有文字说明',
     skipDone:'已跳过这条',
@@ -469,218 +467,11 @@ img{max-width:100%;height:auto}
     queryEmpty:'还没有听到地名，请再说一次',
     queryResult:'听到「{kw}」，找到{n}条路标',
     noMatch:'没有找到「{kw}」的路标，请再语音说一次别的说法',
-    emptyList:'附近暂时没有可以收听的已发布路标'
+    emptyList:'暂时没有可以收听的已发布路标'
   };
 
   /* ===== 4.3 统一数据层（公共契约，逐字写入，函数名与行为不得改动） ===== */
-  const BambooDB=(()=>{
-    const LS='app_bamboo_marks', DBN='app_bamboo_media';
-    const API={ base:'local', setBase(b){this.base=b;} };
-    function load(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return[]}}
-    function persist(l){localStorage.setItem(LS,JSON.stringify(l))}
-    function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);
-      r.onupgradeneeded=()=>r.result.createObjectStore('media');
-      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);})}
-    async function putMedia(key,blob){const db=await idb();
-      return new Promise((res,rej)=>{const tx=db.transaction('media','readwrite');
-        tx.objectStore('media').put(blob,key); tx.oncomplete=()=>res(key);
-        tx.onerror=()=>rej(tx.error);})}
-    async function getMedia(key){const db=await idb();
-      return new Promise((res,rej)=>{const tx=db.transaction('media','readonly');
-        const rq=tx.objectStore('media').get(key);
-        rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);})}
-    function aiReview(m){
-      const flags=[];
-      if(!m.audio||!m.audio.duration||m.audio.duration<20)flags.push('录音时长不足');
-      if(m.blindPath&&m.blindPath.status==='未知')flags.push('盲道状态模糊');
-      if(!m.place||m.place.length<2)flags.push('点位名称不完整');
-      if(!m.audio||!m.audio.duration)flags.push('文字替代录音');
-      return{verdict:flags.length?'unsure':'pass',flags};
-    }
-    async function saveMark(m){
-      m.aiReview=aiReview(m);
-      m.state=m.aiReview.verdict==='pass'?'published':'queue';
-      m.humanReview={status:null,reviewer:null,tags:[],note:null,reviewedAt:null};
-      const l=load();const i=l.findIndex(x=>x.id===m.id);
-      if(i>-1){l[i]=m}else{m.usage=m.usage||{listens:0,confirm:0,inaccurate:0};l.unshift(m)}
-      persist(l);return m;
-    }
-    async function updateMark(id,patch){const l=load();const m=l.find(x=>x.id===id);
-      if(m){Object.assign(m,patch);persist(l)}return m}
-    async function listMarks(f){let l=load();
-      if(f&&f.state)l=l.filter(m=>m.state===f.state);return l}
-    async function markInaccurate(id){const l=load();const m=l.find(x=>x.id===id);
-      if(m&&m.state==='published'){m.usage.inaccurate++;
-        m.aiReview.flags=['视障用户反馈不准'];m.state='queue';persist(l)}return m}
-    return{API,load,persist,listMarks,saveMark,updateMark,markInaccurate,putMedia,getMedia};
-  })();
-  // 服务器模式预留：API.base 非 'local' 时改走 fetch，原型阶段仅写 TODO 注释。
-
-  /* ===== 4.4 种子数据（四端共用）====================================
-     本块集中管理种子数据，是全文件唯一允许改种子内容的地方：
-     · 新增条目写进下面的 ALL_SEEDS，并把 SEED_VER 加 1；
-     · 播种按 id 合并追加：老用户刷新后只会补上新条目，
-       绝不覆盖、绝不删除已存在的记录（用户真实提交/审核过的数据原样保留）。
-     ================================================================ */
-  const now=Date.now(),D=86400000;   // 种子时间基准：时间字段一律用 now-N*D 毫秒时间戳
-  const SEED_VER = 2;                // ← 每次新增种子 +1（老用户靠它触发合并追加）
-  const SEED_KEY = 'app_bamboo_marks';
-  const SEED_VER_KEY = 'app_bamboo_seed_ver';
-
-  // ════ 👉 在这里改种子数据（新增条目都写在这个数组里）════
-  const ALL_SEEDS = [
-     {id:'BM0001',place:'地铁2号线C口无障碍电梯',lat:31.2323,lng:121.4691,
-      submittedAt:now-3*D,vol:{anonId:'竹小节A1024',zhuli:36},
-      audio:{mediaKey:null,duration:42,aiText:'电梯在C口右手边约五米，入口有触觉提示砖，轿厢语音报层清晰，出电梯右转即是盲道。'},
-      photo:{mediaKey:null,aiText:'垂直电梯一部，门框有黄色提示条'},
-      blindPath:{status:'畅通',checkedAt:now-3*D},
-      aiReview:{verdict:'pass',flags:[]},
-      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-      usage:{listens:12,confirm:5,inaccurate:0},state:'published'},
-     {id:'BM0002',place:'人民广场东南角盲道',lat:31.2304,lng:121.4737,
-      submittedAt:now-2*D,vol:{anonId:'竹小节B2077',zhuli:18},
-      audio:{mediaKey:null,duration:35,aiText:'东南角共享单车常压占盲道约十米，绕行请靠右侧花坛边缘。'},
-      photo:{mediaKey:null,aiText:'盲道上停有多辆共享单车'},
-      blindPath:{status:'被占用',checkedAt:now-2*D},
-      aiReview:{verdict:'pass',flags:[]},
-      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-      usage:{listens:8,confirm:2,inaccurate:0},state:'published'},
-     {id:'BM0003',place:'天桥下中山北路口',lat:31.2341,lng:121.4712,
-      submittedAt:now-1*D,vol:{anonId:'竹小节A1024',zhuli:36},
-      audio:{mediaKey:null,duration:12,aiText:'路口……（此处录音过短）'},
-      photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-1*D},
-      aiReview:{verdict:'unsure',flags:['录音时长不足']},
-      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
-     {id:'BM0004',place:'公交17路站台',lat:31.2287,lng:121.4750,
-      submittedAt:now-1*D,vol:{anonId:'竹小节B2077',zhuli:18},
-      audio:{mediaKey:null,duration:28,aiText:'站台有无障碍坡道，候车椅在头节车厢对应位置。'},
-      photo:{mediaKey:null,aiText:'站台照壁为广告灯箱'},
-      blindPath:{status:'部分破损',checkedAt:now-1*D},
-      aiReview:{verdict:'unsure',flags:['描述与图片不一致']},
-      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
-     {id:'BM0005',place:'医院北门坡道',lat:31.2350,lng:121.4668,
-      submittedAt:now-5*D,vol:{anonId:'竹小节A1024',zhuli:36},
-      audio:{mediaKey:null,duration:22,aiText:'北门坡道较陡，两侧有双层扶手。'},
-      photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-5*D},
-      aiReview:{verdict:'unsure',flags:['录音时长不足']},
-      humanReview:{status:'returned',reviewer:'审核员R01',
-        tags:['录音听不清'],note:'风声盖过人声，请靠近话筒或到避风处重录。',
-        reviewedAt:now-4*D},
-      usage:{listens:0,confirm:0,inaccurate:0},state:'returned'},
-     {id:'BM0006',place:'学校东门',lat:31.2295,lng:121.4680,
-      submittedAt:now-6*D,vol:{anonId:'竹小节B2077',zhuli:18},
-      audio:{mediaKey:null,duration:31,aiText:'东门放学时段人流量大，门内左侧有休息座椅。'},
-      photo:{mediaKey:null,aiText:'画面中有多名学生人脸'},
-      blindPath:{status:'未知',checkedAt:now-6*D},
-      aiReview:{verdict:'unsure',flags:['疑似含隐私']},
-      humanReview:{status:'rejected',reviewer:'审核员R01',
-        tags:['疑似含隐私'],note:'画面含学生人脸，请重新拍摄避开人脸。',
-        reviewedAt:now-6*D},
-      usage:{listens:0,confirm:0,inaccurate:0},state:'rejected'},
-    // ---------- 新增 8 条：BM0007～BM0014 ----------
-    // 6 条 published（本端可见）+ 1 条 hidden + 1 条 queue（本端不可见，用来验证过滤）
-    {id:'BM0007',place:'地铁1号线2号口',lat:31.2338,lng:121.4732,
-     submittedAt:now-2*D,vol:{anonId:'竹小节C3001',zhuli:24},
-     audio:{mediaKey:null,duration:38,aiText:'2号口在商场一层，进门后左手边就是扶梯，扶手外侧有一排触觉提示砖。扶梯口地面平整，台阶边沿刷了黄漆，雨天地砖容易打滑，走的时候慢一点。'},
-     photo:{mediaKey:null,aiText:'商场一层的自动扶梯，入口处铺有黄色触觉砖'},
-     blindPath:{status:'畅通',checkedAt:now-2*D},
-     aiReview:{verdict:'pass',score:91,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:21,confirm:7,inaccurate:0},state:'published'},
-    {id:'BM0008',place:'人民广场地下通道',lat:31.2309,lng:121.4705,
-     submittedAt:now-3*D,vol:{anonId:'竹小节C3002',zhuli:31},
-     audio:{mediaKey:null,duration:41,aiText:'通道中间停了四五辆共享单车，横着占了大约三米，右边只剩半米宽的缝。头顶灯偏暗，地面有一段积水，靠左侧墙边的盲道走过去更稳当。'},
-     photo:{mediaKey:null,aiText:'地下通道里横向停着一排共享单车'},
-     blindPath:{status:'被占用',checkedAt:now-3*D},
-     aiReview:{verdict:'pass',score:78,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:14,confirm:4,inaccurate:2},state:'published'},
-    {id:'BM0009',place:'南京西路成都路口',lat:31.2280,lng:121.4612,
-     submittedAt:now-5*D,vol:{anonId:'竹小节D4001',zhuli:17},
-     audio:{mediaKey:null,duration:36,aiText:'路口西北角的人行道砖有三四块松动，踩上去会翘边，靠花坛一侧的盲道断了两米。路口右转车不少，绿灯时间偏短，等灯时站在路缘石后面。'},
-     photo:{mediaKey:null,aiText:'人行道砖松动，靠花坛一侧的盲道断开'},
-     blindPath:{status:'部分破损',checkedAt:now-5*D},
-     aiReview:{verdict:'pass',score:84,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:9,confirm:3,inaccurate:1},state:'published'},
-    {id:'BM0010',place:'延安东路天桥',lat:31.2362,lng:121.4675,
-     submittedAt:now-7*D,vol:{anonId:'竹小节D4002',zhuli:29},
-     audio:{mediaKey:null,duration:44,aiText:'天桥南侧上桥有十四级台阶，扶手是圆的，比较滑。桥面铺了防滑胶垫，靠东边两米的地方有一处缺口，桥头有没有铺盲道，目前还没有确认。'},
-     photo:{mediaKey:null,aiText:'天桥南侧的台阶与圆形扶手'},
-     blindPath:{status:'未知',checkedAt:now-7*D},
-     aiReview:{verdict:'pass',score:72,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:6,confirm:2,inaccurate:1},state:'published'},
-    {id:'BM0011',place:'黄陂南路菜场入口',lat:31.2251,lng:121.4748,
-     submittedAt:now-9*D,vol:{anonId:'竹小节E5001',zhuli:12},
-     audio:{mediaKey:null,duration:33,aiText:'菜场入口在弄堂口右手边三米，门口铺了整块水泥地，比较平。早上七点到九点人最多，门口常摆两个塑料筐，摊位前面的盲道还能走过去。'},
-     photo:{mediaKey:null,aiText:'菜场入口的水泥地面和门口摆放的塑料筐'},
-     blindPath:{status:'畅通',checkedAt:now-9*D},
-     aiReview:{verdict:'pass',score:88,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:17,confirm:5,inaccurate:0},state:'published'},
-    {id:'BM0012',place:'长征医院门诊门口',lat:31.2318,lng:121.4631,
-     submittedAt:now-12*D,vol:{anonId:'竹小节C3003',zhuli:34},
-     audio:{mediaKey:null,duration:39,aiText:'门诊门口停了两排电动车，最外面一辆压住盲道约一米半。门口有斜坡，坡度不大，雨天会积水，旋转门旁边还有一扇一直开着的侧门。'},
-     photo:{mediaKey:null,aiText:'医院门诊门口的电动车与无障碍斜坡'},
-     blindPath:{status:'被占用',checkedAt:now-12*D},
-     aiReview:{verdict:'pass',score:76,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:11,confirm:4,inaccurate:2},state:'published'},
-    {id:'BM0013',place:'西藏中路公交站',lat:31.2375,lng:121.4755,
-     submittedAt:now-15*D,vol:{anonId:'竹小节F6001',zhuli:41},
-     audio:{mediaKey:null,duration:37,aiText:'站台在路口北侧，候车区有顶棚，长椅在站牌右边。站台边沿有一段没护栏，公交车进站时离站台很近，站台前的地面盲道铺得不太连续。'},
-     photo:{mediaKey:null,aiText:'公交站台与候车顶棚'},
-     blindPath:{status:'未知',checkedAt:now-15*D},
-     aiReview:{verdict:'pass',score:86,flags:[]},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:23,confirm:8,inaccurate:1},state:'hidden'},
-    {id:'BM0014',place:'福州路便利店路口',lat:31.2263,lng:121.4669,
-     submittedAt:now-18*D,vol:{anonId:'竹小节D4003',zhuli:21},
-     audio:{mediaKey:null,duration:19,aiText:'便利店门口有三级台阶，最上面一级的边角缺了一块。门口人行道砖大面积起砂，推箱子容易卡住，路口转角的提示砖也缺了两块，路面颜色比周围深。'},
-     photo:{mediaKey:null,aiText:'便利店门口的台阶与起砂的人行道砖'},
-     blindPath:{status:'部分破损',checkedAt:now-18*D},
-     aiReview:{verdict:'unsure',score:52,flags:['录音时长不足']},
-     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
-     usage:{listens:0,confirm:0,inaccurate:0},state:'queue'}
-  ];
-  // ════ 👉 种子数据结束 ════
-
-  /* 播种：按 id 合并追加，已有旧数据的老用户也能拿到新种子 */
-  function seedIfNeeded(){
-    let marks = [];
-    try { marks = JSON.parse(localStorage.getItem(SEED_KEY) || '[]'); } catch (e) { marks = []; }
-    if (!Array.isArray(marks)) marks = [];
-
-    if (marks.length === 0) {
-      // 1. 全新浏览器：一次写入全部种子（原 6 条 + 新 8 条）
-      localStorage.setItem(SEED_KEY, JSON.stringify(ALL_SEEDS));
-    } else {
-      // 2. 已有数据：种子版本旧 → 只补 id 不存在的条目，不覆盖、不删除
-      const ver = Number(localStorage.getItem(SEED_VER_KEY) || 0) || 0;
-      if (ver < SEED_VER) {
-        const have = new Set(marks.map(function (m) { return m && m.id; }));
-        const add = ALL_SEEDS.filter(function (s) { return s && !have.has(s.id); });
-        if (add.length) {
-          for (let i = 0; i < add.length; i++) marks.push(add[i]);
-          localStorage.setItem(SEED_KEY, JSON.stringify(marks));
-        }
-      }
-    }
-
-    // 3. 记下种子版本，下次升版本时才知道要不要补
-    localStorage.setItem(SEED_VER_KEY, String(SEED_VER));
-  }
-  seedIfNeeded();
-  // 种子条目 mediaKey 为 null：播原声时显示「演示数据 · 原声占位」，
-  // 用 speechSynthesis 朗读 aiText 代替（仅种子条目允许）。
-
-  /* =====================================================================
-     以下为本端页面逻辑（全盲端专属）。
-     读屏优先：只做「语义结构 + 焦点管理」，不自研 TTS、不做常驻播报。
-     ===================================================================== */
+  const BambooDB = routePageStore("public");
 
   /* ---------- 小工具 ---------- */
   function $(id) { return document.getElementById(id); }
@@ -762,10 +553,9 @@ img{max-width:100%;height:auto}
     return !!(m && m.audio && m.audio.mediaKey);
   }
 
-  function snippet(text) {
+  function descriptionText(text) {
     const s = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
-    if (!s) return CONFIG.noText;
-    return s.length > 80 ? s.slice(0, 80) + '…' : s;
+    return s || CONFIG.noText;
   }
 
   function summaryLabel(item, index, total) {
@@ -776,7 +566,7 @@ img{max-width:100%;height:auto}
       place: m.place || CONFIG.noPlace,
       dist: item.dist == null ? CONFIG.distUnknown : formatDist(item.dist),
       path: pathText(m),
-      text: snippet(m.audio && m.audio.aiText)
+      text: descriptionText(m.audio && m.audio.aiText)
     };
     return fill(item.dist == null ? CONFIG.markSummaryNoDist : CONFIG.markSummary, vars);
   }
@@ -1014,7 +804,7 @@ img{max-width:100%;height:auto}
   function buildList() {
     let list = publishedMarks().map(function (m) {
       let dist = null;
-      if (S.pos && isFinite(Number(m.lat)) && isFinite(Number(m.lng))) {
+      if (S.pos && Number.isFinite(m.lat) && Number.isFinite(m.lng)) {
         dist = haversine(S.pos.lat, S.pos.lng, Number(m.lat), Number(m.lng));
       }
       return { mark: m, dist: dist };
@@ -1075,7 +865,7 @@ img{max-width:100%;height:auto}
       : '距离约' + formatDist(item.dist) + ' · 盲道' + pathText(m);
     const parts = [
       '<span class="blind-summary-line blind-summary-meta">' + esc(meta) + '</span>',
-      '<span class="blind-summary-line blind-summary-text">' + esc(snippet(m.audio && m.audio.aiText)) + '</span>'
+      '<span class="blind-summary-line blind-summary-text">' + esc(descriptionText(m.audio && m.audio.aiText)) + '</span>'
     ];
     if (!isRealAudio(m)) {
       parts.push('<span class="blind-badge">' + esc(CONFIG.demoBadge) + '</span>');
@@ -1090,13 +880,9 @@ img{max-width:100%;height:auto}
     bListen.dataset.id = String(m.id);
     bListen.dataset.place = place;
 
-    const bInacc = mkBtn('inaccurate', CONFIG.btnInaccurate, place, '');
-    const bAcc = mkBtn('accurate', CONFIG.btnAccurate, place, 'blind-accurate');
     const bSkip = mkBtn('skip', CONFIG.btnSkip, place, '');
 
     actions.appendChild(bListen);
-    actions.appendChild(bInacc);
-    actions.appendChild(bAcc);
     actions.appendChild(bSkip);
 
     li.appendChild(h);
@@ -1286,23 +1072,6 @@ img{max-width:100%;height:auto}
     announce(S.demoSpeak === 'reader' ? CONFIG.speakModeReader : CONFIG.speakModeTts);
   }
 
-  function bumpListens(id) {
-    try {
-      const all = BambooDB.load() || [];
-      let m = null;
-      for (let i = 0; i < all.length; i++) { if (all[i] && all[i].id === id) { m = all[i]; break; } }
-      if (!m || m.state !== 'published') return;
-      const u = m.usage || { listens: 0, confirm: 0, inaccurate: 0 };
-      BambooDB.updateMark(id, {
-        usage: {
-          listens: (u.listens || 0) + 1,
-          confirm: u.confirm || 0,
-          inaccurate: u.inaccurate || 0
-        }
-      });
-    } catch (e) { /* 计数失败不影响收听 */ }
-  }
-
   function stopPlayback(announceEnd) {
     const had = !!S.playingId;
     S.playToken++;
@@ -1417,7 +1186,6 @@ img{max-width:100%;height:auto}
 
     // 演示数据 + 「读屏念」模式：只让系统读屏念，全程只有一条声音通道，不可能叠音
     if (!isRealAudio(m) && S.demoSpeak === 'reader') {
-      bumpListens(m.id);
       announce(CONFIG.demoReading);
       const text = m.audio ? String(m.audio.aiText || '') : '';
       if (!text) { announce(CONFIG.textMissing); return; }
@@ -1477,7 +1245,6 @@ img{max-width:100%;height:auto}
     const token = S.playToken;
     S.playingId = m.id;                 // 从这里开始，页面不再出声，把声道让给播放
     applyPlayState();
-    bumpListens(m.id);
 
     // 种子条目（mediaKey 为 null）：合成语音朗读 aiText。
     // 「演示数据…」那条提示已经在等待前念完了，这里不再插播，避免和读屏撞在一起。
@@ -1493,7 +1260,7 @@ img{max-width:100%;height:auto}
       if (token !== S.playToken || S.destroyed) return;
       if (!blob) {
         announce(CONFIG.playMissing);
-        speakText(m, token);
+        stopPlayback(false);
         return;
       }
       const el = S.audioEl;
@@ -1629,8 +1396,6 @@ img{max-width:100%;height:auto}
     const act = btn.dataset.act;
     if (act === 'summary') onSelect(item, index);
     else if (act === 'listen') toggleListen(item, btn);
-    else if (act === 'inaccurate') onInaccurate(item, index);
-    else if (act === 'accurate') onAccurate(item, index);
     else if (act === 'skip') onSkip(index);
   }
 
@@ -1789,13 +1554,6 @@ img{max-width:100%;height:auto}
 
     document.title = CONFIG.appTitle;
 
-    // 数据层：把配置区的 apiBase 写进公共数据层
-    try { BambooDB.API.setBase(CONFIG.apiBase); } catch (e) { /* 忽略 */ }
-    if (String(CONFIG.apiBase).toLowerCase() !== 'local') {
-      // TODO（服务器模式）：把 load/persist/listMarks/saveMark/updateMark/markInaccurate
-      // 换成 fetch(CONFIG.apiBase + '/api/marks' ...)，本端 UI 与文案不用改。
-    }
-
     S.audioEl = ensureAudioEl();
     bindEvents();
     setRolesOpen(false, false);      // 身份切换默认收起，只留一个按钮
@@ -1812,6 +1570,11 @@ img{max-width:100%;height:auto}
 
     // 定位成功/失败后再渲染列表（避免列表先渲染再重排，导致读屏焦点丢失）
     requestLocation();
+    setupPublishedRoutes(BambooDB,() => {
+      if(S.destroyed) return;
+      buildList();
+      render(0);
+    });
   }
 
   function destroy() {
@@ -1874,64 +1637,5 @@ img{max-width:100%;height:auto}
   init();
 })();
 </script>
-
-<!--
-════════════════════════════════════════════════════════════════════
-【修改说明】
-1) 改文字（最常用）
-   打开本文件，找到脚本最上面的「文字配置区」CONFIG，
-   所有读屏念出来的话都在里面。花括号里的 {place} {dist} {x} {y} {n}
-   是自动填的占位符，不要删，只改花括号外面的字即可。
-2) 调字号
-   改 :root 里的 --bl-fs-body（正文，默认 20px）、--bl-fs-title（标题 30px）、
-   --bl-btn-h（按钮高度 56px）。正文请保持 ≥20px。
-3) 换配色
-   改 :root 里的 --bl-bg（底色）--bl-fg（字色）--bl-card（卡片色）
-   --bl-line（边框色）--bl-focus（焦点轮廓色）。竹语端默认黑底黄字，保持高对比。
-4) 插图位置
-   图片只在 <main> 中间放了注释模板：
-   <img src="你的图片.jpg" alt="图片说明" style="width:100%">
-   去掉注释即可。本端是读屏收听的界面，不放装饰图，alt 必须写清楚。
-5) 接后端
-   ① 把配置区 apiBase:'local' 改成你的服务器地址；
-   ② 在 init() 里标了 TODO 的地方把 BambooDB 的本地读写换成 fetch，
-      接口照公共契约的字段走，本端界面不用改。
-   ③ 后端语言不限定（Node.js / Python / PHP 都能接）。
-6) 定位与语音找地点（本端不提供打字输入）
-   浏览器只在 HTTPS 或 localhost 下给定位权限。双击用 file:// 打开时
-   通常会被拒绝，页面会改成「语音找地点」，提示「定位未开启，您可以语音说出地点」：
-   按「说出地名」按钮，用手机系统的语音识别说出地名（例如「人民广场」），
-   说完会自动过滤列表，不需要再按任何按钮；再说一次可以换个地方。
-   如果这台手机的浏览器没有网页语音识别（例如 iPhone 的 Safari），
-   会提示用输入法上的「麦克风键」说话（系统听写），同样不需要键盘打字，
-   说完 1.5 秒会自动搜索。
-7) 合并四端时不要改的东西
-   根容器 id（view-blind）、blind- 开头的类名、BambooDB 数据层、
-   种子数据、localStorage 键名（app_bamboo_marks 等）。
-8) 数据与播放（重要：别和读屏抢着说话）
-   数据全部存在本机浏览器（localStorage + IndexedDB）。
-   ① 只有一个声音：页面所有播报都走同一条 aria-live，由系统读屏念；
-      播放期间页面停止播报（播报先压住，播完再念），不会和音频叠在一起。
-   ② 开声前让位（规则：读屏念完 → 再空 5 秒 → 才播）：
-      点「听志愿者原声」不会立刻出声，而是等这一轮提示念完（起底 CONFIG.playDelaySec 秒，默认 8），
-      从「念完那一刻」再空 CONFIG.playQuietMs 毫秒（默认 5000）才开口，最长等 playMaxWaitSec 秒（默认 25）。
-      等待期间焦点一动（读屏又会念一段）就把计时往后推；按钮变成「取消等待」，再按一次就取消。
-   ③ 演示数据两种放法（种子条目 mediaKey 为 null，卡片标「演示数据 · 原声占位」）：
-      · 默认「合成语音」：用 speechSynthesis 念 aiText，按 ② 让位后开声；
-      · 备选「读屏念全文」：点一下就让读屏念，全程只有一条声音通道，
-        在手机上绝不会和读屏叠在一起 —— 页面下方「播放方式」按钮一键切换，选择会记住。
-   ④ 真实录音（mediaKey 有值）：同样按 ② 让位后播放，播放期间页面不播报。
-9) 每条路标的四个操作（顺序就是读屏朗读顺序）
-   「听志愿者原声」→ 播放 / 朗读这条的原文（按上面第 8 条 ② 让位再出声）；
-   「标记不准」→ usage.inaccurate 加一，该条回到待审队列（会从列表里移出，优先复核）；
-   「标记准确」→ usage.confirm 加一，路标继续留在列表里（正向确认）；
-   「跳过这条」→ 焦点自动移到下一条。
-10) 顶栏「切换身份」按钮（默认收起）
-    四个身份的链接集中在 <nav id="blind-roles"> 里，平时只显示一个「切换身份」按钮；
-    按一下展开（焦点自动落到第一个身份，读屏立刻念出来），再按一下收起；
-    按 Esc 也会收起并把焦点放回按钮；焦点移出菜单后会自动收起。
-    改名字只改那四个 <a> 的文字，加身份就照同样的 <li><a class="blind-role-link"> 再加一条。
-════════════════════════════════════════════════════════════════════
--->
 </body>
 </html>
