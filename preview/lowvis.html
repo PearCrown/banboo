@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>帮步 Bamboo · 竹影</title>
+<!--
+  帮步 Bamboo · 竹影（四件套之 3/4）
+  单文件、零外部依赖、零 CDN、零构建工具，双击即可运行。
+  公共契约：数据结构 / 状态机 / 数据层 / 种子数据 / localStorage 键 / 根容器 / CSS 前缀 均按提示词 4.x 原样实现。
+-->
+<style>
+/* ============================================================
+   竹影样式：默认即大字 + 高对比（黑底黄字 15.8:1）
+   所有字体一律无衬线；字号只改 :root 变量。
+   ============================================================ */
+:root{
+  /* 竹影只有无衬线黑体，禁止任何衬线字体 */
+  --lv-font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",
+             "Noto Sans CJK SC",sans-serif;
+  /* 大字高对比档（默认） */
+  --lv-bg:#000000; --lv-fg:#FFD400; --lv-card:#111111;
+  --lv-line:#FFD400; --lv-focus:#FFFFFF;
+  --lv-fs-title:30px; --lv-fs-sub:26px; --lv-fs-body:22px; --lv-fs-small:18px;
+  --lv-btn-h:72px; --lv-gap:16px;
+  /* 本端补充变量（照片占位 / 盲道状态色，均配文字+图标，不单靠颜色） */
+  --lv-ph-bg:#1E1E1E; --lv-ph-fg:#FFD400;
+  --lv-ok:#69F0AE; --lv-part:#FFD400; --lv-occ:#FF8A80; --lv-unk:#FFFFFF;
+  color-scheme:dark;
+}
+/* 常规档（html 标签切换 class="lv-regular" 生效）：黑字白底，对比度仍 ≥4.5:1 */
+html.lv-regular{
+  --lv-bg:#FFFFFF; --lv-fg:#1A1A1A; --lv-card:#F7F7F7; --lv-line:#8A8A8A;
+  --lv-focus:#0B57D0;
+  --lv-fs-title:26px; --lv-fs-sub:22px; --lv-fs-body:20px; --lv-fs-small:16px;
+  --lv-btn-h:56px;
+  --lv-ph-bg:#E6E6E6; --lv-ph-fg:#1A1A1A;
+  --lv-ok:#0B6B2F; --lv-part:#7A4E00; --lv-occ:#A31515; --lv-unk:#333333;
+  color-scheme:light;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;scroll-behavior:auto;}
+body{
+  margin:0;padding:0;
+  background:var(--lv-bg);
+  color:var(--lv-fg);
+  font-family:var(--lv-font);
+  font-size:var(--lv-fs-body);
+  line-height:1.7;
+  overflow-wrap:break-word;
+  word-break:normal;
+}
+button,input{font-family:var(--lv-font);}
+[hidden]{display:none !important;}
+body.lowvis-locked{overflow:hidden;}
+
+/* 仅供读屏的播报节点 / 说明文本 */
+.lowvis-sr{
+  position:absolute !important;
+  width:1px;height:1px;
+  margin:-1px;padding:0;
+  overflow:hidden;
+  clip:rect(0 0 0 0);
+  white-space:nowrap;
+  border:0;
+}
+
+#view-lowvis{
+  max-width:900px;
+  margin:0 auto;
+  padding:20px var(--lv-gap) 64px;
+}
+#view-lowvis :focus-visible{
+  outline:4px solid var(--lv-focus);
+  outline-offset:3px;
+}
+
+/* ---------- 顶栏 ---------- */
+.lowvis-header{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom:4px solid var(--lv-line);
+  padding-bottom:14px;
+  margin-bottom:20px;
+}
+.lowvis-title{
+  margin:0;
+  font-size:var(--lv-fs-title);
+  line-height:1.35;
+  font-weight:800;
+  flex:1 1 300px;
+}
+.lowvis-tools{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:stretch;
+}
+
+/* ---------- 按钮：原生 button，整块热区，大字档 ≥72px ---------- */
+.lowvis-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-height:var(--lv-btn-h);
+  margin:0;
+  padding:12px 16px;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+  line-height:1.4;
+  text-align:center;
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+  border:3px solid var(--lv-line);
+  border-radius:12px;
+  cursor:pointer;
+  appearance:none;
+}
+.lowvis-btn-primary{
+  background:var(--lv-fg);
+  color:var(--lv-bg);
+  border-color:var(--lv-fg);
+}
+.lowvis-btn-tool{
+  width:auto;
+  min-width:0;
+  flex:0 1 auto;
+}
+@media (hover:hover){
+  .lowvis-btn:hover,.lowvis-identity-menu a:hover{text-decoration:underline;}
+}
+
+/* ---------- 切换身份菜单 ---------- */
+.lowvis-identity{position:relative;}
+.lowvis-identity-menu{
+  position:absolute;
+  z-index:60;
+  top:calc(100% + 8px);
+  right:0;
+  min-width:300px;
+  max-width:min(92vw,420px);
+  margin:0;
+  padding:10px;
+  background:var(--lv-card);
+  border:3px solid var(--lv-line);
+  border-radius:12px;
+}
+.lowvis-identity-menu ul{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.lowvis-identity-menu a{
+  display:flex;
+  align-items:center;
+  min-height:var(--lv-btn-h);
+  padding:10px 14px;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+  border:3px solid var(--lv-line);
+  border-radius:10px;
+  text-decoration:none;
+}
+.lowvis-identity-menu a[aria-current="page"]{
+  background:var(--lv-fg);
+  color:var(--lv-bg);
+  border-color:var(--lv-fg);
+}
+
+/* ---------- 状态行 ---------- */
+.lowvis-status{
+  margin:0 0 8px;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.5;
+}
+.lowvis-sub{
+  margin:0 0 14px;
+  font-size:var(--lv-fs-small);
+}
+
+/* ---------- 定位失败时的手动查询 ---------- */
+.lowvis-fallback{
+  margin:0 0 20px;
+  padding:var(--lv-gap);
+  background:var(--lv-card);
+  border:3px solid var(--lv-line);
+  border-radius:12px;
+}
+.lowvis-fallback-title{
+  margin:0 0 12px;
+  font-size:var(--lv-fs-sub);
+  line-height:1.5;
+}
+.lowvis-search{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.lowvis-search label{
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+}
+.lowvis-input{
+  width:100%;
+  min-height:var(--lv-btn-h);
+  padding:12px 14px;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+  border:3px solid var(--lv-line);
+  border-radius:12px;
+  appearance:none;
+}
+
+/* ---------- 列表 ---------- */
+.lowvis-section-title{
+  margin:20px 0 14px;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.4;
+}
+.lowvis-list{
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+.lowvis-card{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:var(--lv-gap);
+  background:var(--lv-card);
+  border:2px solid var(--lv-line);
+  border-radius:14px;
+}
+.lowvis-card-title{
+  margin:0;
+  font-size:var(--lv-fs-title);
+  font-weight:800;
+  line-height:1.35;
+}
+.lowvis-card-meta{
+  margin:0;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+}
+.lowvis-empty{
+  margin:0;
+  padding:20px;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+  border:3px dashed var(--lv-line);
+  border-radius:12px;
+}
+.lowvis-soon{
+  margin:0;
+  padding:14px 16px;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+  border:3px dashed var(--lv-line);
+  border-radius:12px;
+}
+
+/* 盲道状态：图标 + 文字 + 颜色 三者并用 */
+.lowvis-blind{
+  display:inline-flex;
+  align-items:center;
+  align-self:flex-start;
+  gap:8px;
+  margin:0;
+  padding:8px 14px;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.4;
+  border:3px solid currentColor;
+  border-radius:10px;
+}
+.lowvis-blind--ok{color:var(--lv-ok);}
+.lowvis-blind--part{color:var(--lv-part);}
+.lowvis-blind--occ{color:var(--lv-occ);}
+.lowvis-blind--unk{color:var(--lv-unk);}
+
+/* ---------- 照片：核心信息，可点开全屏放大 ---------- */
+.lowvis-photo{margin:0;}
+.lowvis-photo-btn{
+  display:block;
+  width:100%;
+  margin:0;
+  padding:0;
+  background:var(--lv-bg);
+  border:3px solid var(--lv-line);
+  border-radius:12px;
+  overflow:hidden;
+  cursor:pointer;
+}
+.lowvis-photo-img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:60vh;
+  object-fit:contain;
+  background:var(--lv-bg);
+}
+.lowvis-photo-ph{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-height:200px;
+  padding:20px;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  text-align:center;
+  color:var(--lv-ph-fg);
+  background:var(--lv-ph-bg);
+}
+.lowvis-photo-hint{
+  display:block;
+  padding:8px 10px;
+  font-size:var(--lv-fs-small);
+  font-weight:700;
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+  border-top:3px solid var(--lv-line);
+}
+
+/* ---------- 演示数据标注 / 播放中三重反馈 ---------- */
+.lowvis-demo-tag{
+  align-self:flex-start;
+  margin:0;
+  padding:6px 12px;
+  font-size:var(--lv-fs-small);
+  font-weight:800;
+  border:3px dashed var(--lv-line);
+  border-radius:8px;
+}
+.lowvis-playing{
+  margin:0;
+  padding:10px 12px;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.5;
+  border:3px solid currentColor;
+  border-radius:8px;
+}
+.lowvis-card.is-playing{
+  background:var(--lv-fg);
+  color:var(--lv-bg);
+  border-color:var(--lv-fg);
+  border-width:3px;
+}
+/* 待确认播放（第一次点按后的「就绪」态）：不反色，用 3px 焦点色边框 + 文字提示 */
+.lowvis-card.is-ready{
+  border:3px solid var(--lv-focus);
+}
+.lowvis-card.is-playing .lowvis-blind,
+.lowvis-card.is-playing .lowvis-demo-tag{
+  color:var(--lv-bg);
+  border-color:var(--lv-bg);
+}
+.lowvis-card.is-playing .lowvis-photo-btn,
+.lowvis-card.is-playing .lowvis-btn{
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+  border-color:var(--lv-bg);
+}
+.lowvis-card.is-playing .lowvis-photo-ph{
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+}
+.lowvis-card.is-playing .lowvis-photo-hint{
+  color:var(--lv-fg);
+  background:var(--lv-bg);
+  border-top-color:var(--lv-bg);
+}
+
+/* ---------- 按钮组：单列通栏 ---------- */
+.lowvis-actions{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin:0;
+}
+
+/* ---------- 详情页 ---------- */
+.lowvis-detail{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.lowvis-detail-title{
+  margin:0;
+  font-size:var(--lv-fs-title);
+  font-weight:800;
+  line-height:1.35;
+}
+.lowvis-h3{
+  margin:8px 0 0;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.5;
+}
+.lowvis-ai-text{
+  margin:0;
+  font-size:var(--lv-fs-body);
+  line-height:1.8;
+}
+
+/* ---------- 全屏照片查看层 ---------- */
+.lowvis-viewer{
+  position:fixed;
+  inset:0;
+  z-index:120;
+  display:flex;
+  flex-direction:column;
+  overflow:auto;
+  padding:16px;
+  background:var(--lv-bg);
+}
+.lowvis-viewer-panel{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  width:100%;
+  max-width:1000px;
+  margin:0 auto;
+}
+.lowvis-viewer-title{
+  margin:0;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.5;
+}
+.lowvis-viewer-stage{
+  max-height:44vh;
+  overflow:auto;
+  display:block;
+  background:var(--lv-bg);
+  border:3px solid var(--lv-line);
+  border-radius:12px;
+  touch-action:pan-x pan-y;
+}
+.lowvis-viewer-stage img{
+  display:block;
+  width:100%;
+  max-width:none;
+  height:auto;
+}
+.lowvis-viewer-ph{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-height:36vh;
+  padding:20px;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  text-align:center;
+  color:var(--lv-ph-fg);
+  background:var(--lv-ph-bg);
+}
+.lowvis-viewer-desc{
+  margin:0;
+  font-size:var(--lv-fs-body);
+  line-height:1.8;
+}
+.lowvis-viewer-zoom{
+  margin:0;
+  font-size:var(--lv-fs-body);
+  font-weight:800;
+}
+.lowvis-viewer-actions{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* ---------- 自制确认弹窗 ---------- */
+.lowvis-modal{
+  position:fixed;
+  inset:0;
+  z-index:140;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:auto;
+  padding:20px;
+  background:var(--lv-bg);
+}
+.lowvis-modal-panel{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  width:100%;
+  max-width:560px;
+  padding:20px;
+  background:var(--lv-card);
+  border:4px solid var(--lv-line);
+  border-radius:16px;
+}
+.lowvis-modal-title{
+  margin:0;
+  font-size:var(--lv-fs-sub);
+  font-weight:800;
+  line-height:1.5;
+}
+.lowvis-modal-desc{
+  margin:0;
+  font-size:var(--lv-fs-body);
+  font-weight:700;
+}
+.lowvis-modal-actions{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+/* ---------- 动效：全站无闪烁/无装饰动画 ---------- */
+@media (prefers-reduced-motion: reduce){
+  #view-lowvis *,
+  #view-lowvis *::before,
+  #view-lowvis *::after{
+    animation:none !important;
+    transition:none !important;
+    scroll-behavior:auto !important;
+  }
+}
+</style>
+</head>
+<body>
+<div role="note" style="position:relative;z-index:9999;padding:14px 18px;background:#fff1bf;color:#342800;font:600 16px/1.6 system-ui,sans-serif;border-bottom:2px solid #a47800">新版界面预览：当前路标、投稿和审核只保存在本机浏览器，未接入云端，请勿用于实际出行或正式投稿。<a href="../index.html" style="color:#173e2b;text-decoration:underline;margin-left:8px">返回云端正式版</a></div>
+
+<div id="view-lowvis" class="view">
+
+  <noscript>
+    <p class="lowvis-soon">本页需要 JavaScript 才能加载路标数据，请在浏览器中开启 JavaScript 后刷新。</p>
+  </noscript>
+
+  <header class="lowvis-header">
+    <h1 class="lowvis-title" id="lowvis-app-title">帮步 Bamboo · 竹影</h1>
+    <div class="lowvis-tools">
+      <button type="button" id="lowvis-contrast" class="lowvis-btn lowvis-btn-tool" aria-pressed="true">常规 / 高对比：高对比</button>
+      <button type="button" id="lowvis-audio-mode-btn" class="lowvis-btn lowvis-btn-tool">播放方式：未选择</button>
+      <div class="lowvis-identity" id="lowvis-identity">
+        <button type="button" id="lowvis-identity-btn" class="lowvis-btn lowvis-btn-tool"
+                aria-expanded="false" aria-haspopup="true" aria-controls="lowvis-identity-menu">切换身份</button>
+        <nav id="lowvis-identity-menu" class="lowvis-identity-menu" aria-label="切换身份" hidden>
+          <ul id="lowvis-identity-list"></ul>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="lowvis-main">
+    <p id="lowvis-status" class="lowvis-status" role="status" aria-live="polite">正在加载路标…</p>
+    <p id="lowvis-coords" class="lowvis-sub"></p>
+
+    <section id="lowvis-locate-fallback" class="lowvis-fallback" aria-labelledby="lowvis-fallback-title" hidden>
+      <h2 id="lowvis-fallback-title" class="lowvis-fallback-title">定位未开启，请在下方输入地点名称</h2>
+      <form id="lowvis-search-form" class="lowvis-search" novalidate>
+        <label id="lowvis-search-label" for="lowvis-search-input">地点名称（例如：人民广场）</label>
+        <input id="lowvis-search-input" class="lowvis-input" type="text" autocomplete="off"
+               enterkeyhint="search" placeholder="输入地名，例如：人民广场">
+        <button type="submit" id="lowvis-search-btn" class="lowvis-btn lowvis-btn-primary">查询</button>
+        <button type="button" id="lowvis-showall-btn" class="lowvis-btn">显示全部路标</button>
+      </form>
+    </section>
+
+    <h2 id="lowvis-list-title" class="lowvis-section-title" tabindex="-1">附近路标（按距离由近到远）</h2>
+    <div id="lowvis-list" class="lowvis-list"></div>
+
+    <section id="lowvis-detail" class="lowvis-detail" aria-labelledby="lowvis-detail-title" hidden>
+      <button type="button" id="lowvis-back-top" class="lowvis-btn">返回列表</button>
+      <h2 id="lowvis-detail-title" class="lowvis-detail-title" tabindex="-1"></h2>
+      <p id="lowvis-detail-meta" class="lowvis-card-meta"></p>
+      <p id="lowvis-detail-blind" class="lowvis-blind lowvis-blind--unk"></p>
+      <div id="lowvis-detail-photo"></div>
+      <h3 id="lowvis-transcript-title" class="lowvis-h3" tabindex="-1">志愿者原声文字稿</h3>
+      <p id="lowvis-detail-text" class="lowvis-ai-text"></p>
+      <h3 id="lowvis-photo-desc-title" class="lowvis-h3">AI 图片描述</h3>
+      <p id="lowvis-detail-photo-desc" class="lowvis-ai-text"></p>
+      <p id="lowvis-detail-submitted" class="lowvis-sub"></p>
+      <p id="lowvis-detail-demo" class="lowvis-demo-tag" hidden>演示数据 · 原声占位</p>
+      <p id="lowvis-detail-playing" class="lowvis-playing" hidden>✓ 已选中：正在播放这条原声</p>
+      <div class="lowvis-actions">
+        <button type="button" id="lowvis-detail-listen" class="lowvis-btn lowvis-btn-primary">听志愿者原声</button>
+        <button type="button" id="lowvis-detail-inaccurate" class="lowvis-btn">标记不准</button>
+        <button type="button" id="lowvis-detail-accurate" class="lowvis-btn">标记准确</button>
+        <button type="button" id="lowvis-back-bottom" class="lowvis-btn">返回列表</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- 全屏照片查看层 -->
+  <div id="lowvis-viewer" class="lowvis-viewer" role="dialog" aria-modal="true"
+       aria-labelledby="lowvis-viewer-title" hidden>
+    <div id="lowvis-viewer-panel" class="lowvis-viewer-panel">
+      <h2 id="lowvis-viewer-title" class="lowvis-viewer-title">照片放大查看</h2>
+      <div id="lowvis-viewer-stage" class="lowvis-viewer-stage"></div>
+      <p id="lowvis-viewer-desc" class="lowvis-viewer-desc"></p>
+      <p id="lowvis-viewer-zoom" class="lowvis-viewer-zoom">当前放大：1 倍</p>
+      <div class="lowvis-viewer-actions">
+        <button type="button" id="lowvis-zoom-in" class="lowvis-btn">放大</button>
+        <button type="button" id="lowvis-zoom-out" class="lowvis-btn">缩小</button>
+        <button type="button" id="lowvis-zoom-close" class="lowvis-btn lowvis-btn-primary">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自制确认弹窗（不使用 alert / confirm） -->
+  <div id="lowvis-modal" class="lowvis-modal" role="dialog" aria-modal="true"
+       aria-labelledby="lowvis-modal-title" aria-describedby="lowvis-modal-desc" hidden>
+    <div id="lowvis-modal-panel" class="lowvis-modal-panel">
+      <h2 id="lowvis-modal-title" class="lowvis-modal-title">确认反馈：这条路标信息不准确？</h2>
+      <p id="lowvis-modal-desc" class="lowvis-modal-desc"></p>
+      <div class="lowvis-modal-actions">
+        <button type="button" id="lowvis-modal-confirm" class="lowvis-btn lowvis-btn-primary">确认</button>
+        <button type="button" id="lowvis-modal-cancel" class="lowvis-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 播放方式选择（首次播放前询问一次，也可从顶栏随时改） -->
+  <div id="lowvis-audio-modal" class="lowvis-modal" role="dialog" aria-modal="true"
+       aria-labelledby="lowvis-audio-title" aria-describedby="lowvis-audio-desc" hidden>
+    <div id="lowvis-audio-panel" class="lowvis-modal-panel">
+      <h2 id="lowvis-audio-title" class="lowvis-modal-title">你怎么听这个页面？</h2>
+      <p id="lowvis-audio-desc" class="lowvis-modal-desc"></p>
+      <div class="lowvis-modal-actions">
+        <button type="button" id="lowvis-audio-sr" class="lowvis-btn lowvis-btn-primary">读屏优先（不自动朗读）</button>
+        <button type="button" id="lowvis-audio-speaker" class="lowvis-btn">用扬声器播放</button>
+        <button type="button" id="lowvis-audio-cancel" class="lowvis-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 播放方式二次确认（只在第一次选择播放方式时出现） -->
+  <div id="lowvis-mode-confirm" class="lowvis-modal" role="dialog" aria-modal="true"
+       aria-labelledby="lowvis-mode-confirm-title" aria-describedby="lowvis-mode-confirm-desc" hidden>
+    <div id="lowvis-mode-confirm-panel" class="lowvis-modal-panel">
+      <h2 id="lowvis-mode-confirm-title" class="lowvis-modal-title">是否确定？</h2>
+      <p id="lowvis-mode-confirm-desc" class="lowvis-modal-desc"></p>
+      <div class="lowvis-modal-actions">
+        <button type="button" id="lowvis-mode-confirm-yes" class="lowvis-btn lowvis-btn-primary">确定</button>
+        <button type="button" id="lowvis-mode-confirm-no" class="lowvis-btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全站唯一动态播报区（polite，禁止 assertive） -->
+  <div id="lowvis-live" class="lowvis-sr" role="status" aria-live="polite"></div>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ===== 👉 【文字配置区】在这里改文字 ===== */
+  const CONFIG={
+    appTitle:'帮步 Bamboo · 竹影',
+    apiBase:'local',            // ← 第1问答案写这里：local（数据存在本机浏览器）
+    backendPlan:'还没定',        // ← 第2问答案记录：Node.js / Python / PHP / 还没定
+    locatedNear:'已定位：{place} ｜ 附近 {n} 条路标',
+    locateFail:'定位未开启，请在下方输入地点名称',
+    blindLabel:{'畅通':'✓ 盲道畅通','部分破损':'△ 盲道部分破损',
+                '被占用':'▲ 盲道被占用','未知':'？ 盲道状态未知'},
+    btnDetail:'查看详情', btnListen:'听志愿者原声', btnStop:'停止播放',
+    btnInaccurate:'标记不准',
+    feedbackDone:'已反馈，这条路标将优先复核，感谢您',
+    demoTag:'演示数据 · 原声占位', demoImg:'演示图片',
+
+    /* 以下为本端补充文案，同样集中在此处修改，不影响四端公共契约 */
+    btnAccurate:'标记准确',
+    confirmAccurateTitle:'确认反馈：这条路标信息准确？',
+    feedbackAccurateDone:'已反馈：这条路标信息准确，感谢您',
+    locatePlaceName:'当前位置',   // 单文件离线无反向地理编码，地名显示为「当前位置」；接后端后可换成逆地理结果
+    foundNear:'已按「{place}」定位 ｜ 相关 {n} 条路标',
+    searchLabel:'地点名称（例如：人民广场）',
+    searchPlaceholder:'输入地名，例如：人民广场',
+    btnSearch:'查询',
+    soonText:'声音明信片：即将上线',
+    btnShowAll:'显示全部路标',
+    listTitle:'附近路标（按距离由近到远）',
+    listTitleNoRef:'全部已发布路标（按提交时间倒序）',
+    btnBack:'返回列表',
+    btnIdentity:'切换身份',
+    transcriptTitle:'志愿者原声文字稿',
+    photoDescTitle:'AI 图片描述',
+    confirmTitle:'确认反馈：这条路标信息不准确？',
+    btnConfirm:'确认',
+    btnCancel:'取消',
+    viewerTitle:'照片放大查看',
+    btnZoomIn:'放大',
+    btnZoomOut:'缩小',
+    btnClose:'关闭',
+    photoHint:'点按放大查看',
+    loadingPhoto:'正在加载照片…',
+    photoUnavailable:'照片暂不可用',
+    /* 播放协调：浏览器无法检测/暂停系统读屏，只能由用户选择并由用户掌握开播时机 */
+    btnAudioModeAsk:'播放方式：未选择',
+    btnAudioModeSR:'播放方式：读屏优先',
+    btnAudioModeSpeaker:'播放方式：扬声器',
+    audioModeTitle:'你怎么听这个页面？',
+    audioModeDesc:'本页不会自动出声。浏览器没有「检测读屏 / 让出声道」的接口，所以用两种方式配合：读屏优先——本页完全不自己朗读，只把文字稿交给你自己的读屏；扬声器——允许本页发声，但每次都要按两次（第一次只是提示，等读屏念完再按第二次）。',
+    btnAudioSR:'读屏优先（不自动朗读）',
+    btnAudioSpeaker:'用扬声器播放',
+    modeConfirmTitle:'是否确定？',
+    modeConfirmSR:'将把播放方式设为「读屏优先」：本页不再自己朗读，由你的读屏读文字稿。确定后也可在顶栏「播放方式」里更改。',
+    modeConfirmSpeaker:'将把播放方式设为「扬声器」：本页会发声，每次播放前还要再按一次确认。确定后也可在顶栏「播放方式」里更改。',
+    btnModeConfirmYes:'确定',
+    btnModeConfirmNo:'取消',
+    modeChangeCancelled:'没有更改播放方式，请重新选择。',
+    btnReady:'再按一次开始播放',
+    readyBadge:'已就绪：再按一次开始播放（Esc 取消）',
+    readyHint:'已就绪：再按一次开始播放。读屏念完这句话再按，按 Esc 取消。',
+    btnReadTranscript:'读文字稿（读屏优先）',
+    srTranscriptHint:'读屏优先：已切到文字稿，请用读屏阅读。',
+    audioModeSRDone:'已选择读屏优先：本页不再自己朗读。',
+    audioModeSpeakerDone:'已选择扬声器播放：每次点两次才出声。',
+    /* 身份切换链接集中一处，将来换成内部路由只改这里 */
+    identityLinks:[
+      {label:'竹小节 · 采集',     href:'./volunteer.html'},
+      {label:'竹语 · 读屏收听',   href:'./blind.html'},
+      {label:'竹影 · 大字高对比', href:'./lowvis.html', current:true},
+      {label:'竹卫 · 审核',       href:'./review.html'}
+    ]
+  };
+
+  /* ============================================================
+     公共契约 4.3：统一数据层（逐字写入，函数名与行为不得改动）
+     ============================================================ */
+  const BambooDB=(()=>{
+    const LS='app_bamboo_marks', DBN='app_bamboo_media';
+    const API={ base:'local', setBase(b){this.base=b;} };
+    function load(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return[]}}
+    function persist(l){localStorage.setItem(LS,JSON.stringify(l))}
+    function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('media');
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);})}
+    async function putMedia(key,blob){const db=await idb();
+      return new Promise((res,rej)=>{const tx=db.transaction('media','readwrite');
+        tx.objectStore('media').put(blob,key); tx.oncomplete=()=>res(key);
+        tx.onerror=()=>rej(tx.error);})}
+    async function getMedia(key){const db=await idb();
+      return new Promise((res,rej)=>{const tx=db.transaction('media','readonly');
+        const rq=tx.objectStore('media').get(key);
+        rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);})}
+    function aiReview(m){
+      const flags=[];
+      if(!m.audio||!m.audio.duration||m.audio.duration<20)flags.push('录音时长不足');
+      if(m.blindPath&&m.blindPath.status==='未知')flags.push('盲道状态模糊');
+      if(!m.place||m.place.length<2)flags.push('点位名称不完整');
+      if(!m.audio||!m.audio.duration)flags.push('文字替代录音');
+      return{verdict:flags.length?'unsure':'pass',flags};
+    }
+    async function saveMark(m){
+      m.aiReview=aiReview(m);
+      m.state=m.aiReview.verdict==='pass'?'published':'queue';
+      m.humanReview={status:null,reviewer:null,tags:[],note:null,reviewedAt:null};
+      const l=load();const i=l.findIndex(x=>x.id===m.id);
+      if(i>-1){l[i]=m}else{m.usage=m.usage||{listens:0,confirm:0,inaccurate:0};l.unshift(m)}
+      persist(l);return m;
+    }
+    async function updateMark(id,patch){const l=load();const m=l.find(x=>x.id===id);
+      if(m){Object.assign(m,patch);persist(l)}return m}
+    async function listMarks(f){let l=load();
+      if(f&&f.state)l=l.filter(m=>m.state===f.state);return l}
+    async function markInaccurate(id){const l=load();const m=l.find(x=>x.id===id);
+      if(m&&m.state==='published'){m.usage.inaccurate++;
+        m.aiReview.flags=['视障用户反馈不准'];m.state='queue';persist(l)}return m}
+    return{API,load,persist,listMarks,saveMark,updateMark,markInaccurate,putMedia,getMedia};
+  })();
+  // 服务器模式预留：API.base 非 'local' 时改走 fetch，原型阶段仅写 TODO 注释。
+
+  /* ============================================================
+     公共契约 4.4：种子数据（首次打开写入，四端完全相同）
+     ============================================================ */
+  const SEED_VER=2;   // 种子版本号：每次新增种子 +1（合并式播种用）
+  function seedIfNeeded(){
+    const now=Date.now(),D=86400000;
+    // ════ 👉 在这里改种子数据（新增条目都写在这个数组里）════
+    const ALL_SEEDS=[
+     {id:'BM0001',place:'地铁2号线C口无障碍电梯',lat:31.2323,lng:121.4691,
+      submittedAt:now-3*D,vol:{anonId:'竹小节A1024',zhuli:36},
+      audio:{mediaKey:null,duration:42,aiText:'电梯在C口右手边约五米，入口有触觉提示砖，轿厢语音报层清晰，出电梯右转即是盲道。'},
+      photo:{mediaKey:null,aiText:'垂直电梯一部，门框有黄色提示条'},
+      blindPath:{status:'畅通',checkedAt:now-3*D},
+      aiReview:{verdict:'pass',flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:12,confirm:5,inaccurate:0},state:'published'},
+     {id:'BM0002',place:'人民广场东南角盲道',lat:31.2304,lng:121.4737,
+      submittedAt:now-2*D,vol:{anonId:'竹小节B2077',zhuli:18},
+      audio:{mediaKey:null,duration:35,aiText:'东南角共享单车常压占盲道约十米，绕行请靠右侧花坛边缘。'},
+      photo:{mediaKey:null,aiText:'盲道上停有多辆共享单车'},
+      blindPath:{status:'被占用',checkedAt:now-2*D},
+      aiReview:{verdict:'pass',flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:8,confirm:2,inaccurate:0},state:'published'},
+     {id:'BM0003',place:'天桥下中山北路口',lat:31.2341,lng:121.4712,
+      submittedAt:now-1*D,vol:{anonId:'竹小节A1024',zhuli:36},
+      audio:{mediaKey:null,duration:12,aiText:'路口……（此处录音过短）'},
+      photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-1*D},
+      aiReview:{verdict:'unsure',flags:['录音时长不足']},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
+     {id:'BM0004',place:'公交17路站台',lat:31.2287,lng:121.4750,
+      submittedAt:now-1*D,vol:{anonId:'竹小节B2077',zhuli:18},
+      audio:{mediaKey:null,duration:28,aiText:'站台有无障碍坡道，候车椅在头节车厢对应位置。'},
+      photo:{mediaKey:null,aiText:'站台照壁为广告灯箱'},
+      blindPath:{status:'部分破损',checkedAt:now-1*D},
+      aiReview:{verdict:'unsure',flags:['描述与图片不一致']},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
+     {id:'BM0005',place:'医院北门坡道',lat:31.2350,lng:121.4668,
+      submittedAt:now-5*D,vol:{anonId:'竹小节A1024',zhuli:36},
+      audio:{mediaKey:null,duration:22,aiText:'北门坡道较陡，两侧有双层扶手。'},
+      photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-5*D},
+      aiReview:{verdict:'unsure',flags:['录音时长不足']},
+      humanReview:{status:'returned',reviewer:'审核员R01',
+        tags:['录音听不清'],note:'风声盖过人声，请靠近话筒或到避风处重录。',
+        reviewedAt:now-4*D},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'returned'},
+     {id:'BM0006',place:'学校东门',lat:31.2295,lng:121.4680,
+      submittedAt:now-6*D,vol:{anonId:'竹小节B2077',zhuli:18},
+      audio:{mediaKey:null,duration:31,aiText:'东门放学时段人流量大，门内左侧有休息座椅。'},
+      photo:{mediaKey:null,aiText:'画面中有多名学生人脸'},
+      blindPath:{status:'未知',checkedAt:now-6*D},
+      aiReview:{verdict:'unsure',flags:['疑似含隐私']},
+      humanReview:{status:'rejected',reviewer:'审核员R01',
+        tags:['疑似含隐私'],note:'画面含学生人脸，请重新拍摄避开人脸。',
+        reviewedAt:now-6*D},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'rejected'},
+     {id:'BM0007',place:'地铁1号线A口',lat:31.2268,lng:121.4742,
+      submittedAt:now-1*D,vol:{anonId:'竹小节C3001',zhuli:24},
+      audio:{mediaKey:null,duration:38,aiText:'出A口右手边两米铺着盲道砖，砖面平整，一直通到公交站台。傍晚下班时人流很密，台阶一侧常停着共享单车。雨天砖缝会积水，靠站牌那一小段干得快一些。'},
+      photo:{mediaKey:null,aiText:'黄色盲道砖沿台阶铺到公交站牌下，砖缝里有少量积水'},
+      blindPath:{status:'畅通',checkedAt:now-1*D},
+      aiReview:{verdict:'pass',score:88,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:21,confirm:7,inaccurate:0},state:'published'},
+     {id:'BM0008',place:'过街天桥南侧楼梯',lat:31.2299,lng:121.4665,
+      submittedAt:now-3*D,vol:{anonId:'竹小节C3002',zhuli:31},
+      audio:{mediaKey:null,duration:44,aiText:'天桥南侧楼梯口右手边有一条斜坡，坡面防滑条磨掉了一半，推轮椅经过会有些颠。楼梯扶手左侧连续，右侧中间断了一截。桥下车流声大，语音提示听不太清。'},
+      photo:{mediaKey:null,aiText:'斜坡防滑条多处脱落，扶手在转角处断开一截'},
+      blindPath:{status:'部分破损',checkedAt:now-3*D},
+      aiReview:{verdict:'pass',score:76,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:14,confirm:4,inaccurate:1},state:'published'},
+     {id:'BM0009',place:'医院门诊楼正门',lat:31.2372,lng:121.4631,
+      submittedAt:now-5*D,vol:{anonId:'竹小节C3003',zhuli:42},
+      audio:{mediaKey:null,duration:52,aiText:'门诊楼正门前的盲道被两排临时停车占住，中间只留半米宽。门内左手边是导医台，门口保安亭一侧留出一条通道。上午八点到十点最挤，救护车进出频繁。'},
+      photo:{mediaKey:null,aiText:'盲道上并排停着两排电动车，只留出一条很窄的缝'},
+      blindPath:{status:'被占用',checkedAt:now-5*D},
+      aiReview:{verdict:'pass',score:82,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:26,confirm:9,inaccurate:2},state:'published'},
+     {id:'BM0010',place:'实验小学门口斑马线',lat:31.2235,lng:121.4778,
+      submittedAt:now-8*D,vol:{anonId:'竹小节C3004',zhuli:17},
+      audio:{mediaKey:null,duration:29,aiText:'实验小学校门正前方约五米是斑马线，正对着一排早餐摊，早上七点半摊车会占住一半路面。路缘石比路面高出约十厘米，没有坡道。放学时家长多，路口靠交警临时指挥。'},
+      photo:{mediaKey:null,aiText:'斑马线一端停着三辆早餐推车，路缘石没有坡道'},
+      blindPath:{status:'未知',checkedAt:now-8*D},
+      aiReview:{verdict:'pass',score:73,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:6,confirm:1,inaccurate:0},state:'published'},
+     {id:'BM0011',place:'朝阳菜市场东门',lat:31.2318,lng:121.4622,
+      submittedAt:now-11*D,vol:{anonId:'竹小节C3005',zhuli:15},
+      audio:{mediaKey:null,duration:33,aiText:'菜市场东门进去是一条水泥路，门口两级台阶没有扶手，两侧堆着塑料筐。早上六点开始摊位外扩，通道只剩一米左右。地面常年潮湿，菜叶和塑料袋容易打滑。'},
+      photo:{mediaKey:null,aiText:'市场东门两级台阶上堆着塑料筐，地面有菜叶和积水'},
+      blindPath:{status:'部分破损',checkedAt:now-11*D},
+      aiReview:{verdict:'pass',score:79,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:11,confirm:3,inaccurate:0},state:'published'},
+     {id:'BM0012',place:'24小时便利店路口',lat:31.2256,lng:121.4699,
+      submittedAt:now-14*D,vol:{anonId:'竹小节C3006',zhuli:9},
+      audio:{mediaKey:null,duration:25,aiText:'便利店店门右手边的转角有盲道拐弯提示砖，砖面被门槛压平了一段。店外冰柜摆到人行道上，占去约三分之一宽度。晚上灯箱很亮，雨天路沿下会积一层水。'},
+      photo:{mediaKey:null,aiText:'店门口冰柜摆到人行道上，盲道拐弯砖被压平'},
+      blindPath:{status:'畅通',checkedAt:now-14*D},
+      aiReview:{verdict:'pass',score:84,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:18,confirm:5,inaccurate:0},state:'published'},
+     {id:'BM0013',place:'地铁3号线B口电梯',lat:31.2331,lng:121.4788,
+      submittedAt:now-2*D,vol:{anonId:'竹小节C3007',zhuli:28},
+      audio:{mediaKey:null,duration:40,aiText:'B口电梯在出口左后方约三米，轿厢内按钮带凸点，门口地面有一道排水沟。电梯运行有轻微晃动，停层提示音偏小。晚高峰排队大约三四分钟。'},
+      photo:{mediaKey:null,aiText:'电梯轿厢门框有黄色提示条，门口地面有一道排水沟'},
+      blindPath:{status:'畅通',checkedAt:now-2*D},
+      aiReview:{verdict:'pass',score:90,flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:9,confirm:3,inaccurate:0},state:'hidden'},
+     {id:'BM0014',place:'公园北门无障碍坡道',lat:31.2214,lng:121.4652,
+      submittedAt:now-17*D,vol:{anonId:'竹小节C3008',zhuli:12},
+      audio:{mediaKey:null,duration:15,aiText:'公园北门坡道两侧有金属扶手，坡面铺着防滑颗粒，长度大约八米。坡道尽头接一小段石板路，石板接缝高低不平。傍晚遛弯的人多，婴儿车常停在坡道口。'},
+      photo:{mediaKey:null,aiText:'坡道两侧金属扶手，坡口停着两辆婴儿车'},
+      blindPath:{status:'部分破损',checkedAt:now-17*D},
+      aiReview:{verdict:'unsure',score:64,flags:['录音时长不足','坡道是否常被占用待核实']},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'}
+    ];
+    // ════ 👉 种子数据到此结束（下面是合并式播种逻辑，一般不用改）════
+
+    let marks=[];
+    try{marks=JSON.parse(localStorage.getItem('app_bamboo_marks')||'[]');}catch(e){marks=[];}
+    if(!Array.isArray(marks))marks=[];
+    const ver=+(localStorage.getItem('app_bamboo_seed_ver')||0);
+    if(marks.length===0){
+      // 1. 首次：没有任何数据 → 写入全部种子（原 6 条 + 新 8 条）
+      localStorage.setItem('app_bamboo_marks',JSON.stringify(ALL_SEEDS));
+    }else if(ver<SEED_VER){
+      // 2. 已有数据且种子版本旧 → 只追加 id 不存在的种子，
+      //    绝不覆盖、绝不删除已存在的记录（用户真实提交/审核过的数据原样保留）
+      const have=new Set(marks.map(function(m){return m.id;}));
+      ALL_SEEDS.forEach(function(s){if(!have.has(s.id))marks.push(s);});
+      localStorage.setItem('app_bamboo_marks',JSON.stringify(marks));
+    }
+    // 3. 版本号存 localStorage 的 app_bamboo_seed_ver 键
+    localStorage.setItem('app_bamboo_seed_ver',String(SEED_VER));
+  }
+  seedIfNeeded();
+  // 种子条目 mediaKey 为 null：照片显示占位色块+文字「演示图片」；
+  // 播原声显示「演示数据 · 原声占位」并用 speechSynthesis 朗读 aiText
+  //（仅种子条目允许，用户真实提交的一律显示真实照片、播真实录音）。
+
+  /* ============================================================
+     界面层
+     ============================================================ */
+  const state={
+    marks:[],          // state==='published' 的路标
+    ref:null,          // {lat,lng,label,source:'geo'|'search'} 距离参考点
+    query:'',          // 手动查询关键词
+    locateFailed:false,
+    selectedId:null,
+    detailOpen:false,
+    playing:null,      // {id,trigger,utter,audio,url}
+    ready:null,        // {id,trigger} 第一次点按后的「就绪」态（等读屏念完再按第二次）
+    audioMode:'',      // ''未选择 | 'sr'读屏优先 | 'speaker'扬声器
+    pendingMode:null,  // 第一次选择后等待「是否确定」的临时值
+    accurate:new Set(),// 本次会话已标记准确的 id（避免重复累加 usage.confirm）
+    viewerScale:1,
+    initialized:false,
+    destroyed:false
+  };
+
+  const els={};
+  const cardRefs=new Map();
+  const listeners=[];
+  let announceTimer=null;
+  let geoGuard=null;
+  let cardReg={urls:[],cancelled:false};
+  let detailReg={urls:[],cancelled:false};
+  let pinchStart=null;
+
+  /* ---------- 小工具 ---------- */
+  function el(tag,attrs,children){
+    const n=document.createElement(tag);
+    if(attrs){
+      Object.keys(attrs).forEach(function(k){
+        const v=attrs[k];
+        if(v===undefined||v===null) return;
+        if(k==='class') n.className=v;
+        else if(k==='text') n.textContent=v;
+        else if(k==='dataset'){Object.keys(v).forEach(function(d){n.dataset[d]=v[d];});}
+        else n.setAttribute(k,v);
+      });
+    }
+    if(children){
+      (Array.isArray(children)?children:[children]).forEach(function(c){
+        if(c===null||c===undefined) return;
+        n.appendChild(typeof c==='string'?document.createTextNode(c):c);
+      });
+    }
+    return n;
+  }
+  function on(target,type,fn,opts){
+    target.addEventListener(type,fn,opts);
+    listeners.push([target,type,fn,opts]);
+  }
+  function announce(msg){
+    if(!els.live) return;
+    if(announceTimer){clearTimeout(announceTimer);announceTimer=null;}
+    els.live.textContent='';
+    announceTimer=setTimeout(function(){
+      announceTimer=null;
+      els.live.textContent=msg;
+    },80);
+  }
+  function makeReg(){return {urls:[],cancelled:false};}
+  function revokeReg(reg){
+    reg.cancelled=true;
+    reg.urls.forEach(function(u){try{URL.revokeObjectURL(u);}catch(e){}});
+    reg.urls.length=0;
+  }
+  function lockScroll(){
+    const locked=!els.modal.hidden||!els.viewer.hidden||!els.audioModal.hidden||!els.modeConfirm.hidden;
+    document.body.classList.toggle('lowvis-locked',locked);
+  }
+  function findMark(id){
+    for(let i=0;i<state.marks.length;i++) if(state.marks[i].id===id) return state.marks[i];
+    return null;
+  }
+  function hasRealAudio(m){return !!(m&&m.audio&&m.audio.mediaKey);}
+  function photoAlt(m){
+    if(m&&m.photo&&m.photo.aiText) return m.photo.aiText;
+    return (m&&m.place?m.place:'')+'的环境照片';
+  }
+  function photoDesc(m){return (m&&m.photo&&m.photo.aiText)?m.photo.aiText:'';}
+  function blindText(status){
+    return CONFIG.blindLabel[status]||CONFIG.blindLabel['未知'];
+  }
+  function blindClass(status){
+    if(status==='畅通') return 'lowvis-blind--ok';
+    if(status==='部分破损') return 'lowvis-blind--part';
+    if(status==='被占用') return 'lowvis-blind--occ';
+    return 'lowvis-blind--unk';
+  }
+  function haversine(lat1,lng1,lat2,lng2){
+    const R=6371000;
+    const rad=function(x){return x*Math.PI/180;};
+    const dLat=rad(lat2-lat1), dLng=rad(lng2-lng1);
+    const a=Math.sin(dLat/2)*Math.sin(dLat/2)+
+            Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+  function distanceTo(m){
+    if(!state.ref||typeof m.lat!=='number'||typeof m.lng!=='number') return null;
+    return haversine(state.ref.lat,state.ref.lng,m.lat,m.lng);
+  }
+  function fmtDistance(m){
+    if(m<10) return '就在此处';
+    if(m<990) return '约'+(Math.round(m/10)*10)+'米';
+    if(m<1000) return '约1.0公里';
+    return '约'+(m/1000).toFixed(1)+'公里';
+  }
+  function fmtCoord(v){return Number(v).toFixed(5);}
+  function fmtDate(ts){
+    const d=new Date(ts);
+    if(isNaN(d.getTime())) return '未知';
+    return d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  }
+  function fmtScale(s){
+    const r=Math.round(s*10)/10;
+    return (r%1===0)?String(r):r.toFixed(1);
+  }
+
+  /* ---------- DOM 缓存 ---------- */
+  function cacheEls(){
+    const $=function(id){return document.getElementById(id);};
+    els.appTitle=$('lowvis-app-title');
+    els.contrastBtn=$('lowvis-contrast');
+    els.audioModeBtn=$('lowvis-audio-mode-btn');
+    els.identityRoot=$('lowvis-identity');
+    els.identityBtn=$('lowvis-identity-btn');
+    els.identityMenu=$('lowvis-identity-menu');
+    els.identityList=$('lowvis-identity-list');
+    els.status=$('lowvis-status');
+    els.coords=$('lowvis-coords');
+    els.fallback=$('lowvis-locate-fallback');
+    els.fallbackTitle=$('lowvis-fallback-title');
+    els.searchForm=$('lowvis-search-form');
+    els.searchLabel=$('lowvis-search-label');
+    els.searchInput=$('lowvis-search-input');
+    els.searchBtn=$('lowvis-search-btn');
+    els.showAllBtn=$('lowvis-showall-btn');
+    els.listTitle=$('lowvis-list-title');
+    els.list=$('lowvis-list');
+    els.detail=$('lowvis-detail');
+    els.detailTitle=$('lowvis-detail-title');
+    els.detailMeta=$('lowvis-detail-meta');
+    els.detailBlind=$('lowvis-detail-blind');
+    els.detailPhoto=$('lowvis-detail-photo');
+    els.transcriptTitle=$('lowvis-transcript-title');
+    els.detailText=$('lowvis-detail-text');
+    els.photoDescTitle=$('lowvis-photo-desc-title');
+    els.detailPhotoDesc=$('lowvis-detail-photo-desc');
+    els.detailSubmitted=$('lowvis-detail-submitted');
+    els.detailDemo=$('lowvis-detail-demo');
+    els.detailPlaying=$('lowvis-detail-playing');
+    els.detailListen=$('lowvis-detail-listen');
+    els.detailInaccurate=$('lowvis-detail-inaccurate');
+    els.detailAccurate=$('lowvis-detail-accurate');
+    els.backTop=$('lowvis-back-top');
+    els.backBottom=$('lowvis-back-bottom');
+    els.modal=$('lowvis-modal');
+    els.modalPanel=$('lowvis-modal-panel');
+    els.modalTitle=$('lowvis-modal-title');
+    els.modalDesc=$('lowvis-modal-desc');
+    els.modalConfirm=$('lowvis-modal-confirm');
+    els.modalCancel=$('lowvis-modal-cancel');
+    els.audioModal=$('lowvis-audio-modal');
+    els.audioPanel=$('lowvis-audio-panel');
+    els.audioTitle=$('lowvis-audio-title');
+    els.audioDesc=$('lowvis-audio-desc');
+    els.audioSR=$('lowvis-audio-sr');
+    els.audioSpeaker=$('lowvis-audio-speaker');
+    els.audioCancel=$('lowvis-audio-cancel');
+    els.modeConfirm=$('lowvis-mode-confirm');
+    els.modeConfirmPanel=$('lowvis-mode-confirm-panel');
+    els.modeConfirmTitle=$('lowvis-mode-confirm-title');
+    els.modeConfirmDesc=$('lowvis-mode-confirm-desc');
+    els.modeConfirmYes=$('lowvis-mode-confirm-yes');
+    els.modeConfirmNo=$('lowvis-mode-confirm-no');
+    els.viewer=$('lowvis-viewer');
+    els.viewerPanel=$('lowvis-viewer-panel');
+    els.viewerTitle=$('lowvis-viewer-title');
+    els.viewerStage=$('lowvis-viewer-stage');
+    els.viewerDesc=$('lowvis-viewer-desc');
+    els.zoomText=$('lowvis-viewer-zoom');
+    els.zoomIn=$('lowvis-zoom-in');
+    els.zoomOut=$('lowvis-zoom-out');
+    els.zoomClose=$('lowvis-zoom-close');
+    els.live=$('lowvis-live');
+  }
+
+  /* ---------- 静态文案（全部来自 CONFIG） ---------- */
+  function applyStaticCopy(){
+    document.title=CONFIG.appTitle;
+    els.appTitle.textContent=CONFIG.appTitle;
+    els.identityBtn.textContent=CONFIG.btnIdentity;
+    els.fallbackTitle.textContent=CONFIG.locateFail;
+    els.searchLabel.textContent=CONFIG.searchLabel;
+    els.searchInput.setAttribute('placeholder',CONFIG.searchPlaceholder);
+    els.searchBtn.textContent=CONFIG.btnSearch;
+    els.showAllBtn.textContent=CONFIG.btnShowAll;
+    els.backTop.textContent=CONFIG.btnBack;
+    els.backBottom.textContent=CONFIG.btnBack;
+    els.transcriptTitle.textContent=CONFIG.transcriptTitle;
+    els.photoDescTitle.textContent=CONFIG.photoDescTitle;
+    els.detailListen.textContent=CONFIG.btnListen;
+    els.detailInaccurate.textContent=CONFIG.btnInaccurate;
+    els.detailAccurate.textContent=CONFIG.btnAccurate;
+    els.modalTitle.textContent=CONFIG.confirmTitle;
+    els.modalDesc.textContent='';
+    els.modalConfirm.textContent=CONFIG.btnConfirm;
+    els.modalCancel.textContent=CONFIG.btnCancel;
+    els.viewerTitle.textContent=CONFIG.viewerTitle;
+    els.zoomIn.textContent=CONFIG.btnZoomIn;
+    els.zoomOut.textContent=CONFIG.btnZoomOut;
+    els.zoomClose.textContent=CONFIG.btnClose;
+    els.detailPlaying.textContent='✓ 已选中：正在播放这条原声';
+    els.audioTitle.textContent=CONFIG.audioModeTitle;
+    els.audioDesc.textContent=CONFIG.audioModeDesc;
+    els.audioSR.textContent=CONFIG.btnAudioSR;
+    els.audioSpeaker.textContent=CONFIG.btnAudioSpeaker;
+    els.audioCancel.textContent=CONFIG.btnCancel;
+    els.modeConfirmTitle.textContent=CONFIG.modeConfirmTitle;
+    els.modeConfirmDesc.textContent='';
+    els.modeConfirmYes.textContent=CONFIG.btnModeConfirmYes;
+    els.modeConfirmNo.textContent=CONFIG.btnModeConfirmNo;
+    updateAudioModeBtn();
+  }
+
+  /* ---------- 设置：主题 + 播放方式，一起存 app_bamboo_settings ---------- */
+  function loadSettings(){
+    try{
+      const raw=localStorage.getItem('app_bamboo_settings');
+      const s=raw?JSON.parse(raw):null;
+      return (s&&typeof s==='object')?s:{};
+    }catch(e){return {};}
+  }
+  function loadTheme(){
+    return loadSettings().contrast==='regular'?'regular':'high';
+  }
+  function loadAudioMode(){
+    const m=loadSettings().audioMode;
+    return (m==='sr'||m==='speaker')?m:'';
+  }
+  function saveSettings(){
+    try{
+      localStorage.setItem('app_bamboo_settings',
+        JSON.stringify({contrast:state.theme,audioMode:state.audioMode||''}));
+    }catch(e){/* 隐私模式下写入失败不阻塞使用 */}
+  }
+  function applyTheme(mode,announceIt){
+    state.theme=mode;
+    document.documentElement.classList.toggle('lv-regular',mode==='regular');
+    if(els.contrastBtn){
+      els.contrastBtn.setAttribute('aria-pressed',mode==='high'?'true':'false');
+      els.contrastBtn.textContent=(mode==='high'
+        ?'常规 / 高对比：高对比'
+        :'常规 / 高对比：常规');
+    }
+    if(announceIt){
+      announce(mode==='high'
+        ?'已切换到高对比模式：黑底黄字，大字号'
+        :'已切换到常规模式：白底黑字');
+      saveSettings();
+    }
+  }
+
+  /* ---------- 播放方式：读屏优先 / 扬声器 ---------- */
+  function updateAudioModeBtn(){
+    if(!els.audioModeBtn) return;
+    els.audioModeBtn.textContent=(state.audioMode==='sr'?CONFIG.btnAudioModeSR
+      :(state.audioMode==='speaker'?CONFIG.btnAudioModeSpeaker:CONFIG.btnAudioModeAsk));
+  }
+  function openAudioModeModal(onDone){
+    state.audioModePrompt={
+      onDone:onDone||null,
+      trigger:document.activeElement||null,
+      firstTime:!state.audioMode   // 只有第一次选播放方式时才二次确认
+    };
+    els.audioModal.hidden=false;
+    lockScroll();
+    els.audioSR.focus();
+    announce('请选择播放方式：读屏优先，或用扬声器播放');
+  }
+  function closeAudioModeModal(restoreFocus){
+    const info=state.audioModePrompt;
+    state.audioModePrompt=null;
+    state.pendingMode=null;
+    els.audioModal.hidden=true;
+    els.modeConfirm.hidden=true;
+    lockScroll();
+    if(restoreFocus&&info&&info.trigger&&document.contains(info.trigger)) info.trigger.focus();
+    else if(restoreFocus&&els.listTitle) els.listTitle.focus();
+  }
+  function chooseAudioMode(mode){
+    const info=state.audioModePrompt;
+    if(!info) return;
+    if(info.firstTime){
+      // 第一次：先收起选择弹窗，再弹「是否确定？」
+      state.pendingMode=mode;
+      els.audioModal.hidden=true;
+      els.modeConfirmDesc.textContent=(mode==='sr'?CONFIG.modeConfirmSR:CONFIG.modeConfirmSpeaker);
+      els.modeConfirm.hidden=false;
+      lockScroll();
+      els.modeConfirmYes.focus();
+      announce(CONFIG.modeConfirmTitle+'将把播放方式设为'+(mode==='sr'?'读屏优先':'扬声器'));
+      return;
+    }
+    applyAudioMode(mode,info);
+  }
+  function applyAudioMode(mode,info){
+    state.audioMode=mode;
+    state.ready=null;
+    state.pendingMode=null;
+    state.audioModePrompt=null;
+    saveSettings();
+    updateAudioModeBtn();
+    els.audioModal.hidden=true;
+    els.modeConfirm.hidden=true;
+    lockScroll();
+    if(info&&info.trigger&&document.contains(info.trigger)) info.trigger.focus();
+    updatePlayingUI();
+    if(info&&info.onDone){
+      info.onDone();
+    }else{
+      announce(mode==='sr'?CONFIG.audioModeSRDone:CONFIG.audioModeSpeakerDone);
+    }
+  }
+  function confirmAudioMode(){
+    const info=state.audioModePrompt;
+    const mode=state.pendingMode;
+    if(!mode||!info) return;
+    applyAudioMode(mode,info);
+  }
+  function cancelAudioModeConfirm(){
+    const mode=state.pendingMode;
+    state.pendingMode=null;
+    els.modeConfirm.hidden=true;
+    els.audioModal.hidden=false;
+    lockScroll();
+    if(mode==='sr') els.audioSR.focus();
+    else if(mode==='speaker') els.audioSpeaker.focus();
+    else els.audioSR.focus();
+    announce(CONFIG.modeChangeCancelled);
+  }
+
+  /* ---------- 顶栏：切换身份（四链接集中一处） ---------- */
+  function renderIdentity(){
+    els.identityList.textContent='';
+    CONFIG.identityLinks.forEach(function(item){
+      const li=el('li');
+      const a=el('a',{href:item.href});
+      a.textContent=item.label;
+      if(item.current) a.setAttribute('aria-current','page');
+      li.appendChild(a);
+      els.identityList.appendChild(li);
+    });
+  }
+  function toggleIdentity(){
+    if(els.identityMenu.hidden){
+      els.identityMenu.hidden=false;
+      els.identityBtn.setAttribute('aria-expanded','true');
+      const first=els.identityMenu.querySelector('a');
+      if(first) first.focus();
+    }else{
+      closeIdentity(true);
+    }
+  }
+  function closeIdentity(focusBtn){
+    els.identityMenu.hidden=true;
+    els.identityBtn.setAttribute('aria-expanded','false');
+    if(focusBtn) els.identityBtn.focus();
+  }
+  function onDocClick(e){
+    if(!els.identityMenu||els.identityMenu.hidden) return;
+    if(els.identityRoot&&els.identityRoot.contains(e.target)) return;
+    closeIdentity(false);
+  }
+
+  /* ---------- 定位 ---------- */
+  function locate(){
+    if(!navigator.geolocation){onLocateFail();return;}
+    let settled=false;
+    const finish=function(ok,pos){
+      if(settled) return;
+      settled=true;
+      if(geoGuard){clearTimeout(geoGuard);geoGuard=null;}
+      if(ok&&pos&&pos.coords) onLocateSuccess(pos);
+      else onLocateFail();
+    };
+    geoGuard=setTimeout(function(){finish(false);},9000);
+    try{
+      navigator.geolocation.getCurrentPosition(
+        function(pos){finish(true,pos);},
+        function(){finish(false);},
+        {enableHighAccuracy:false,timeout:8000,maximumAge:60000}
+      );
+    }catch(e){finish(false);}
+  }
+  function onLocateSuccess(pos){
+    state.locateFailed=false;
+    state.ref={
+      lat:pos.coords.latitude,
+      lng:pos.coords.longitude,
+      label:CONFIG.locatePlaceName,
+      source:'geo'
+    };
+    els.coords.textContent='坐标 '+fmtCoord(state.ref.lat)+', '+fmtCoord(state.ref.lng)
+      +' ｜ 按直线距离由近到远排列';
+    syncFallback();
+    renderList();
+    updateStatus();
+  }
+  function onLocateFail(){
+    state.locateFailed=true;
+    state.ref=null;
+    els.coords.textContent='';
+    syncFallback();
+    updateStatus();
+  }
+  function syncFallback(){
+    els.fallback.hidden=!(state.locateFailed&&!state.detailOpen);
+  }
+
+  /* ---------- 状态文案（aria-live polite） ---------- */
+  function updateStatus(){
+    const n=visibleMarks().length;
+    let text='';
+    if(state.ref&&state.ref.source==='geo'){
+      text=CONFIG.locatedNear.replace('{place}',CONFIG.locatePlaceName).replace('{n}',String(n));
+    }else if(state.ref&&state.ref.source==='search'){
+      text=CONFIG.foundNear.replace('{place}',state.ref.label).replace('{n}',String(n));
+    }else if(state.locateFailed){
+      text=CONFIG.locateFail;
+    }else{
+      text='正在获取定位，请稍候…';
+    }
+    els.status.textContent=text;
+  }
+
+  /* ---------- 列表数据 ---------- */
+  function visibleMarks(){
+    let arr=state.marks.slice();
+    if(state.query){
+      const q=state.query;
+      arr=arr.filter(function(m){return m.place.indexOf(q)>-1;});
+    }
+    if(state.ref){
+      arr.sort(function(a,b){
+        const da=distanceTo(a), db=distanceTo(b);
+        if(da===null||db===null) return 0;
+        return (da-db)||((b.submittedAt||0)-(a.submittedAt||0));
+      });
+    }else{
+      arr.sort(function(a,b){return (b.submittedAt||0)-(a.submittedAt||0);});
+    }
+    return arr;
+  }
+
+  /* ---------- 列表渲染 ---------- */
+  function renderList(){
+    revokeReg(cardReg);
+    cardReg=makeReg();
+    cardRefs.clear();
+    els.list.textContent='';
+    els.listTitle.textContent=state.ref?CONFIG.listTitle:CONFIG.listTitleNoRef;
+
+    const items=visibleMarks();
+    // 若正在播放 / 已就绪的路标被筛选或反馈移出列表，立即停止，避免出现「看不见的播放器」
+    if(state.playing&&!(state.detailOpen&&state.selectedId===state.playing.id)){
+      const stillListed=items.some(function(m){return m.id===state.playing.id;});
+      if(!stillListed) stopPlayback(false);
+    }
+    if(state.ready&&!(state.detailOpen&&state.selectedId===state.ready.id)){
+      const stillReady=items.some(function(m){return m.id===state.ready.id;});
+      if(!stillReady){state.ready=null;}
+    }
+    if(!items.length){
+      const p=el('p',{class:'lowvis-empty'});
+      p.textContent=state.query
+        ?'没有找到包含「'+state.query+'」的已发布路标。'
+        :'暂无可显示的已发布路标。';
+      els.list.appendChild(p);
+      appendSoonNote();
+      return;
+    }
+    const frag=document.createDocumentFragment();
+    items.forEach(function(m){frag.appendChild(buildCard(m));});
+    els.list.appendChild(frag);
+    appendSoonNote();
+    updatePlayingUI();
+  }
+
+  /* 声音明信片：本端不做，仅占位 */
+  function appendSoonNote(){
+    const p=el('p',{class:'lowvis-soon'});
+    p.textContent=CONFIG.soonText;
+    els.list.appendChild(p);
+  }
+
+  function buildCard(m){
+    const dist=distanceTo(m);
+    const card=el('article',{class:'lowvis-card','aria-labelledby':'lowvis-place-'+m.id});
+
+    card.appendChild(el('h2',{class:'lowvis-card-title',id:'lowvis-place-'+m.id,text:m.place}));
+
+    const meta=el('p',{class:'lowvis-card-meta'});
+    meta.textContent=(dist===null?'距离：未知（未定位）':'距离：'+fmtDistance(dist))
+      +' ｜ 编号：'+m.id;
+    card.appendChild(meta);
+
+    const status=(m.blindPath&&m.blindPath.status)||'未知';
+    const blind=el('p',{class:'lowvis-blind '+blindClass(status)});
+    blind.textContent=blindText(status);
+    card.appendChild(blind);
+
+    card.appendChild(buildPhoto(m,cardReg));
+
+    if(!hasRealAudio(m)){
+      const tag=el('p',{class:'lowvis-demo-tag'});
+      tag.textContent=CONFIG.demoTag;
+      card.appendChild(tag);
+    }
+
+    const playingBadge=el('p',{class:'lowvis-playing'});
+    playingBadge.textContent='✓ 已选中：正在播放这条原声';
+    playingBadge.hidden=true;
+    card.appendChild(playingBadge);
+
+    const actions=el('div',{class:'lowvis-actions'});
+    const bDetail=el('button',{type:'button',class:'lowvis-btn lowvis-btn-primary'});
+    bDetail.textContent=CONFIG.btnDetail;
+    const bListen=el('button',{type:'button',class:'lowvis-btn'});
+    bListen.textContent=CONFIG.btnListen;
+    const bBad=el('button',{type:'button',class:'lowvis-btn'});
+    bBad.textContent=CONFIG.btnInaccurate;
+    const bAcc=el('button',{type:'button',class:'lowvis-btn'});
+    bAcc.textContent=CONFIG.btnAccurate;
+
+    bDetail.addEventListener('click',function(){openDetail(m.id,bDetail);});
+    bListen.addEventListener('click',function(){toggleListen(m.id,bListen);});
+    bBad.addEventListener('click',function(){openConfirm(m.id,bBad,'inaccurate');});
+    bAcc.addEventListener('click',function(){openConfirm(m.id,bAcc,'accurate');});
+
+    actions.appendChild(bDetail);
+    actions.appendChild(bListen);
+    actions.appendChild(bBad);
+    actions.appendChild(bAcc);
+    card.appendChild(actions);
+
+    cardRefs.set(m.id,{card:card,playingBadge:playingBadge,listenBtn:bListen,
+                        detailBtn:bDetail,badBtn:bBad});
+    return card;
+  }
+
+  /* ---------- 照片（真实照片走 IndexedDB；种子走占位色块） ---------- */
+  function buildPhoto(m,reg){
+    const alt=photoAlt(m);
+    const btn=el('button',{type:'button',class:'lowvis-photo-btn',
+      'aria-label':'放大查看照片：'+alt});
+    btn.__media={type:'demo'};
+
+    if(m.photo&&m.photo.mediaKey){
+      const ph=el('span',{class:'lowvis-photo-ph','aria-hidden':'true'});
+      ph.textContent=CONFIG.loadingPhoto;
+      btn.appendChild(ph);
+      BambooDB.getMedia(m.photo.mediaKey).then(function(blob){
+        if(state.destroyed||reg.cancelled) return;
+        if(!blob){
+          ph.textContent=CONFIG.photoUnavailable;
+          btn.__media={type:'demo'};
+          return;
+        }
+        const url=URL.createObjectURL(blob);
+        reg.urls.push(url);
+        const img=el('img',{class:'lowvis-photo-img',alt:alt,src:url});
+        btn.replaceChild(img,ph);
+        btn.__media={type:'img',src:url};
+      }).catch(function(){
+        if(reg.cancelled) return;
+        ph.textContent=CONFIG.photoUnavailable;
+        btn.__media={type:'demo'};
+      });
+    }else{
+      const ph=el('span',{class:'lowvis-photo-ph','aria-hidden':'true'});
+      ph.textContent=CONFIG.demoImg;
+      btn.appendChild(ph);
+    }
+
+    const hint=el('span',{class:'lowvis-photo-hint','aria-hidden':'true'});
+    hint.textContent=CONFIG.photoHint;
+    btn.appendChild(hint);
+
+    btn.addEventListener('click',function(){
+      const media={type:btn.__media.type,src:btn.__media.src,alt:alt,desc:photoDesc(m)};
+      openViewer(media,btn);
+    });
+
+    const fig=el('figure',{class:'lowvis-photo'});
+    fig.appendChild(btn);
+    return fig;
+  }
+
+  /* ---------- 听原声：与系统读屏的协调规则 ----------
+     · 首次播放先问「读屏优先 / 扬声器」，之后可在顶栏随时改；
+     · 每次播放都要按两次：第一次只显示「就绪」并用 aria-live 提示，
+       等读屏把这句念完，用户再按第二次——用人工确认代替猜时间的定时器；
+     · 读屏优先模式完全不用 speechSynthesis，种子条目改为把焦点交给文字稿；
+     · 播放期间不写 aria-live（否则读屏会同时开口），只保留视觉反馈；
+     · 焦点离开播放按钮、按 Esc、页面切后台，立即停止。 */
+  function toggleListen(id,trigger){
+    const m=findMark(id);
+    if(!m) return;
+    if(!state.audioMode){
+      openAudioModeModal(function(){doListen(id,trigger||null);});
+      return;
+    }
+    doListen(id,trigger||null);
+  }
+
+  function doListen(id,trigger){
+    const m=findMark(id);
+    if(!m) return;
+
+    // 第二次点按 → 真正开始播放
+    if(state.ready&&state.ready.id===id){
+      state.ready=null;
+      updatePlayingUI();
+      playMark(id,trigger);
+      return;
+    }
+    if(state.playing&&state.playing.id===id){
+      stopPlayback(true);
+      return;
+    }
+    stopPlayback(false);
+    state.ready=null;
+
+    // 读屏优先 + 种子条目（没有真实录音）→ 本页不朗读，把文字稿交给读屏
+    if(state.audioMode==='sr'&&!hasRealAudio(m)){
+      openTranscript(m);
+      return;
+    }
+
+    // 第一次点按 → 只进入「就绪」，不发声
+    state.ready={id:id,trigger:trigger};
+    updatePlayingUI();
+    announce(CONFIG.readyHint);
+  }
+
+  function openTranscript(m){
+    if(!state.detailOpen||state.selectedId!==m.id) openDetail(m.id,null);
+    if(els.transcriptTitle) els.transcriptTitle.focus();
+  }
+
+  function playMark(id,trigger){
+    const m=findMark(id);
+    if(!m) return;
+    // 开始出声前清掉待播报的 polite 文本：避免读屏在音频开始后又念一遍提示造成叠音
+    if(announceTimer){clearTimeout(announceTimer);announceTimer=null;}
+    if(els.live) els.live.textContent='';
+
+    if(m.audio&&m.audio.mediaKey){
+      const token={id:id,trigger:trigger||null,audio:null,utter:null,url:null};
+      state.playing=token;
+      updatePlayingUI();
+      BambooDB.getMedia(m.audio.mediaKey).then(function(blob){
+        if(state.destroyed||state.playing!==token) return;
+        if(!blob){stopPlayback(false);announce('原声暂不可用');return;}
+        const url=URL.createObjectURL(blob);
+        token.url=url;
+        const audio=document.createElement('audio');
+        audio.src=url;
+        audio.preload='auto';
+        token.audio=audio;
+        audio.addEventListener('ended',function(){
+          if(state.playing===token) stopPlayback(false);
+        });
+        const p=audio.play();
+        if(p&&p.catch) p.catch(function(){
+          if(state.playing===token){stopPlayback(false);announce('播放失败，请再试一次');}
+        });
+        updatePlayingUI();
+      }).catch(function(){
+        if(state.playing===token){stopPlayback(false);announce('原声暂不可用');}
+      });
+      return;
+    }
+
+    const text=(m.audio&&m.audio.aiText)?m.audio.aiText:'';
+    if(!text){updatePlayingUI();announce('这条路标没有文字稿');return;}
+    if(!('speechSynthesis' in window)){updatePlayingUI();announce('当前浏览器不支持语音朗读');return;}
+    try{
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang='zh-CN';
+      u.rate=0.95;
+      const token={id:id,trigger:trigger||null,audio:null,utter:u,url:null};
+      state.playing=token;
+      u.onend=function(){if(state.playing===token) stopPlayback(false);};
+      u.onerror=function(){if(state.playing===token) stopPlayback(false);};
+      window.speechSynthesis.speak(u);
+      updatePlayingUI();
+    }catch(e){
+      state.playing=null;
+      updatePlayingUI();
+      announce('朗读失败，请稍后再试');
+    }
+  }
+
+  function stopPlayback(announceStop){
+    const p=state.playing;
+    state.playing=null;
+    if(p){
+      if(p.utter){
+        try{window.speechSynthesis.cancel();}catch(e){}
+      }
+      if(p.audio){
+        try{
+          p.audio.pause();
+          p.audio.removeAttribute('src');
+          p.audio.load();
+        }catch(e){}
+      }
+      if(p.url){try{URL.revokeObjectURL(p.url);}catch(e){}}
+    }
+    updatePlayingUI();
+    if(announceStop) announce('已停止播放');
+  }
+
+  function listenLabel(m,playing,ready){
+    if(playing) return CONFIG.btnStop;
+    if(ready) return CONFIG.btnReady;
+    if(state.audioMode==='sr'&&!hasRealAudio(m)) return CONFIG.btnReadTranscript;
+    return CONFIG.btnListen;
+  }
+
+  function updatePlayingUI(){
+    const pid=state.playing?state.playing.id:null;
+    const rid=state.ready?state.ready.id:null;
+    cardRefs.forEach(function(r,id){
+      const m=findMark(id);
+      if(!m) return;
+      const playing=(id===pid);
+      const ready=(id===rid);
+      r.card.classList.toggle('is-playing',playing);
+      r.card.classList.toggle('is-ready',ready);
+      r.playingBadge.hidden=!(playing||ready);
+      r.playingBadge.textContent=playing?'✓ 已选中：正在播放这条原声':CONFIG.readyBadge;
+      r.listenBtn.textContent=listenLabel(m,playing,ready);
+    });
+    if(els.detailListen&&state.selectedId){
+      const m=findMark(state.selectedId);
+      if(!m) return;
+      const playing=(pid===state.selectedId);
+      const ready=(rid===state.selectedId);
+      els.detailListen.textContent=listenLabel(m,playing,ready);
+      els.detailPlaying.hidden=!(playing||ready);
+      els.detailPlaying.textContent=playing?'✓ 已选中：正在播放这条原声':CONFIG.readyBadge;
+    }
+  }
+
+  /* ---------- 详情 ---------- */
+  function openDetail(id,trigger){
+    const m=findMark(id);
+    if(!m) return;
+    if(state.playing&&state.playing.id!==id) stopPlayback(false);
+    if(state.ready&&state.ready.id!==id) state.ready=null;
+    state.selectedId=id;
+    state.detailOpen=true;
+    state.detailTrigger=trigger||null;
+
+    els.listTitle.hidden=true;
+    els.list.hidden=true;
+    els.fallback.hidden=true;
+    els.detail.hidden=false;
+
+    fillDetail(m);
+    window.scrollTo(0,0);
+    announce('已打开详情：'+m.place);
+    if(els.detailTitle) els.detailTitle.focus();
+  }
+
+  function fillDetail(m){
+    els.detailTitle.textContent=m.place;
+    const dist=distanceTo(m);
+    els.detailMeta.textContent=
+      (dist===null?'距离：未知（未定位）':'距离：'+fmtDistance(dist))+' ｜ 编号：'+m.id;
+
+    const status=(m.blindPath&&m.blindPath.status)||'未知';
+    els.detailBlind.className='lowvis-blind '+blindClass(status);
+    els.detailBlind.textContent=blindText(status);
+
+    revokeReg(detailReg);
+    detailReg=makeReg();
+    els.detailPhoto.textContent='';
+    els.detailPhoto.appendChild(buildPhoto(m,detailReg));
+
+    els.detailText.textContent=(m.audio&&m.audio.aiText)
+      ?m.audio.aiText:'（未提供志愿者原声文字稿）';
+    els.detailPhotoDesc.textContent=(m.photo&&m.photo.aiText)
+      ?m.photo.aiText:'（未提供图片描述）';
+
+    const submitted=m.submittedAt?fmtDate(m.submittedAt):'未知';
+    const checked=(m.blindPath&&m.blindPath.checkedAt)?fmtDate(m.blindPath.checkedAt):'未知';
+    els.detailSubmitted.textContent='提交日期：'+submitted+' ｜ 盲道核查日期：'+checked;
+
+    els.detailDemo.hidden=hasRealAudio(m);
+    els.detailDemo.textContent=CONFIG.demoTag;
+
+    updatePlayingUI();
+  }
+
+  function closeDetail(){
+    const trigger=state.detailTrigger;
+    state.detailOpen=false;
+    state.selectedId=null;
+    revokeReg(detailReg);
+    detailReg=makeReg();
+    els.detail.hidden=true;
+    els.detailPhoto.textContent='';
+    els.listTitle.hidden=false;
+    els.list.hidden=false;
+    syncFallback();
+    window.scrollTo(0,0);
+    if(trigger&&document.contains(trigger)) trigger.focus();
+    else if(els.listTitle) els.listTitle.focus();
+    announce('已返回路标列表');
+  }
+
+  /* ---------- 反馈：标记不准 / 标记准确（共用同一个确认弹窗） ---------- */
+  function openConfirm(id,trigger,kind){
+    const m=findMark(id);
+    if(!m) return;
+    const k=(kind==='accurate')?'accurate':'inaccurate';
+    state.confirm={id:id,trigger:trigger||null,kind:k};
+    els.modalTitle.textContent=(k==='accurate'?CONFIG.confirmAccurateTitle:CONFIG.confirmTitle);
+    els.modalDesc.textContent=m.place;
+    els.modal.hidden=false;
+    lockScroll();
+    els.modalConfirm.focus();
+    announce('已打开确认弹窗：'+(k==='accurate'
+      ?'确认反馈这条路标信息准确？'
+      :'确认反馈这条路标信息不准确？'));
+  }
+
+  function closeConfirm(){
+    const info=state.confirm;
+    state.confirm=null;
+    els.modal.hidden=true;
+    lockScroll();
+    if(info&&info.trigger&&document.contains(info.trigger)) info.trigger.focus();
+    else if(els.listTitle) els.listTitle.focus();
+  }
+
+  function onConfirmClick(){
+    const info=state.confirm;
+    if(!info) return;
+    if(info.kind==='accurate') doMarkAccurate();
+    else doMarkInaccurate();
+  }
+
+  async function doMarkInaccurate(){
+    const info=state.confirm;
+    if(!info) return;
+    const id=info.id;
+    state.confirm=null;
+    els.modal.hidden=true;
+    lockScroll();
+
+    if(state.playing&&state.playing.id===id) stopPlayback(false);
+    if(state.ready&&state.ready.id===id) state.ready=null;
+
+    try{ await BambooDB.markInaccurate(id); }catch(e){}
+    try{
+      state.marks=await BambooDB.listMarks({state:'published'});
+    }catch(e){ state.marks=[]; }
+
+    if(state.detailOpen&&state.selectedId===id){
+      state.detailOpen=false;
+      state.selectedId=null;
+      revokeReg(detailReg);
+      detailReg=makeReg();
+      els.detail.hidden=true;
+      els.detailPhoto.textContent='';
+      els.listTitle.hidden=false;
+      els.list.hidden=false;
+      syncFallback();
+    }
+
+    renderList();
+    updateStatus();
+    announce(CONFIG.feedbackDone);
+    if(els.listTitle) els.listTitle.focus();
+  }
+
+  /* 标记准确：不改变 state，只累加 usage.confirm；同一条路标本次会话只计一次 */
+  async function doMarkAccurate(){
+    const info=state.confirm;
+    if(!info) return;
+    const id=info.id;
+    state.confirm=null;
+    els.modal.hidden=true;
+    lockScroll();
+    const m=findMark(id);
+    if(!m) return;
+
+    if(state.accurate.has(id)){
+      announce(CONFIG.feedbackAccurateDone);
+      if(info.trigger&&document.contains(info.trigger)) info.trigger.focus();
+      else if(els.listTitle) els.listTitle.focus();
+      return;
+    }
+    state.accurate.add(id);
+
+    const usage=Object.assign({listens:0,confirm:0,inaccurate:0},m.usage||{});
+    usage.confirm=(usage.confirm||0)+1;
+    try{ await BambooDB.updateMark(id,{usage:usage}); }catch(e){}
+    m.usage=usage;
+
+    announce(CONFIG.feedbackAccurateDone);
+    if(info.trigger&&document.contains(info.trigger)) info.trigger.focus();
+    else if(els.listTitle) els.listTitle.focus();
+  }
+
+  /* ---------- 全屏照片查看（放大 / 缩小 / 关闭 + 双指捏合） ---------- */
+  function openViewer(media,trigger){
+    state.viewer={trigger:trigger||null};
+    state.viewerScale=1;
+    els.viewerStage.textContent='';
+    if(media&&media.type==='img'&&media.src){
+      const img=el('img',{alt:media.alt||'',src:media.src});
+      els.viewerStage.appendChild(img);
+      els.viewerTitle.textContent=CONFIG.viewerTitle;
+    }else{
+      const ph=el('span',{class:'lowvis-viewer-ph'});
+      ph.textContent=CONFIG.demoImg;
+      els.viewerStage.appendChild(ph);
+      els.viewerTitle.textContent=CONFIG.demoImg+'（放大查看）';
+    }
+    els.viewerDesc.textContent=media&&media.desc
+      ?'图片描述：'+media.desc
+      :'（暂无图片描述）';
+    setScale(1);
+    els.viewer.hidden=false;
+    lockScroll();
+    els.zoomIn.focus();
+    announce('已打开照片放大查看：可用放大、缩小按钮或双指捏合');
+  }
+
+  function closeViewer(){
+    const trigger=state.viewer?state.viewer.trigger:null;
+    state.viewer=null;
+    els.viewer.hidden=true;
+    els.viewerStage.textContent='';
+    lockScroll();
+    if(trigger&&document.contains(trigger)) trigger.focus();
+    announce('已关闭照片查看');
+  }
+
+  function setScale(scale){
+    let s=Number(scale);
+    if(isNaN(s)) s=1;
+    s=Math.min(4,Math.max(1,s));
+    state.viewerScale=s;
+    const target=els.viewerStage.firstElementChild;
+    if(target) target.style.width=(s*100)+'%';
+    els.zoomText.textContent='当前放大：'+fmtScale(s)+' 倍';
+  }
+
+  function pinchDistance(touches){
+    const dx=touches[0].clientX-touches[1].clientX;
+    const dy=touches[0].clientY-touches[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  function onTouchStart(e){
+    if(e.touches&&e.touches.length===2) pinchStart=pinchDistance(e.touches);
+    else pinchStart=null;
+  }
+  function onTouchMove(e){
+    if(!pinchStart||!e.touches||e.touches.length!==2) return;
+    const d=pinchDistance(e.touches);
+    if(!d) return;
+    if(e.cancelable) e.preventDefault();
+    setScale(state.viewerScale*(d/pinchStart));
+    pinchStart=d;
+  }
+  function onTouchEnd(e){
+    if(!e.touches||e.touches.length<2) pinchStart=null;
+  }
+
+  /* ---------- 键盘：Esc 关闭 / Tab 焦点锁定 ---------- */
+  function trapTab(e,container){
+    const nodes=container.querySelectorAll(
+      'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+    const list=[];
+    for(let i=0;i<nodes.length;i++){
+      const n=nodes[i];
+      if(!n.disabled&&n.offsetParent!==null) list.push(n);
+    }
+    if(!list.length) return;
+    const first=list[0], last=list[list.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  }
+  function onKeydown(e){
+    const modeConfirmOpen=els.modeConfirm&&!els.modeConfirm.hidden;
+    const audioOpen=els.audioModal&&!els.audioModal.hidden;
+    const modalOpen=els.modal&&!els.modal.hidden;
+    const viewerOpen=els.viewer&&!els.viewer.hidden;
+    if(e.key==='Escape'||e.key==='Esc'){
+      if(modeConfirmOpen){e.preventDefault();cancelAudioModeConfirm();return;}
+      if(audioOpen){e.preventDefault();closeAudioModeModal(true);return;}
+      if(modalOpen){e.preventDefault();closeConfirm();return;}
+      if(viewerOpen){e.preventDefault();closeViewer();return;}
+      if(els.identityMenu&&!els.identityMenu.hidden){e.preventDefault();closeIdentity(true);return;}
+      // 没有弹窗时，Esc 停止正在播放/已就绪的音频（读屏用户随时能静音）
+      if(state.playing){e.preventDefault();stopPlayback(true);return;}
+      if(state.ready){e.preventDefault();state.ready=null;updatePlayingUI();return;}
+      return;
+    }
+    if(e.key==='Tab'){
+      if(modeConfirmOpen) trapTab(e,els.modeConfirmPanel);
+      else if(audioOpen) trapTab(e,els.audioPanel);
+      else if(modalOpen) trapTab(e,els.modalPanel);
+      else if(viewerOpen) trapTab(e,els.viewerPanel);
+    }
+  }
+
+  /* 焦点一离开播放按钮就停止：读屏用户移动焦点时读屏会开口，及时静音避免叠音 */
+  function onFocusIn(e){
+    if(state.playing){
+      const trig=state.playing.trigger;
+      if(!trig||e.target!==trig) stopPlayback(false);
+      return;
+    }
+    if(state.ready){
+      const trig=state.ready.trigger;
+      if(!trig||e.target!==trig){state.ready=null;updatePlayingUI();}
+    }
+  }
+  /* 点按页面其他位置（不是正在播放/就绪的那个按钮）也立即停止，避免用户以为静音了其实还在响 */
+  function onDocClickAudio(e){
+    if(state.playing){
+      const trig=state.playing.trigger;
+      if(!trig||e.target!==trig) stopPlayback(false);
+      return;
+    }
+    if(state.ready){
+      const trig=state.ready.trigger;
+      if(!trig||e.target!==trig){state.ready=null;updatePlayingUI();}
+    }
+  }
+  function onVisibilityChange(){
+    if(document.hidden){
+      if(state.playing) stopPlayback(false);
+      if(state.ready){state.ready=null;updatePlayingUI();}
+    }
+  }
+  function onPageHide(){
+    if(state.playing) stopPlayback(false);
+  }
+
+  /* ---------- 手动查询 ---------- */
+  function onSearch(e){
+    e.preventDefault();
+    const q=(els.searchInput.value||'').trim();
+    if(!q){
+      state.query='';
+      if(state.ref&&state.ref.source==='search'){state.ref=null;els.coords.textContent='';}
+      renderList();updateStatus();
+      announce('已清空筛选，显示全部路标');
+      return;
+    }
+    const hits=state.marks.filter(function(m){return m.place.indexOf(q)>-1;});
+    if(!hits.length){
+      state.query='';
+      if(state.ref&&state.ref.source==='search'){state.ref=null;els.coords.textContent='';}
+      renderList();updateStatus();
+      announce('没有找到包含「'+q+'」的路标，已显示全部路标');
+      return;
+    }
+    state.query=q;
+    state.ref={lat:hits[0].lat,lng:hits[0].lng,label:hits[0].place,source:'search'};
+    els.coords.textContent='参考点：'+hits[0].place+' ｜ 按直线距离由近到远排列';
+    renderList();updateStatus();
+    announce('已按「'+q+'」筛选，共 '+visibleMarks().length+' 条路标');
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  function bindEvents(){
+    on(els.contrastBtn,'click',function(){
+      applyTheme(state.theme==='high'?'regular':'high',true);
+    });
+    on(els.audioModeBtn,'click',function(){openAudioModeModal(null);});
+    on(els.audioSR,'click',function(){chooseAudioMode('sr');});
+    on(els.audioSpeaker,'click',function(){chooseAudioMode('speaker');});
+    on(els.audioCancel,'click',function(){closeAudioModeModal(true);});
+    on(els.modeConfirmYes,'click',confirmAudioMode);
+    on(els.modeConfirmNo,'click',cancelAudioModeConfirm);
+    on(els.identityBtn,'click',toggleIdentity);
+    on(els.searchForm,'submit',onSearch);
+    on(els.showAllBtn,'click',function(){
+      state.query='';
+      els.searchInput.value='';
+      if(state.ref&&state.ref.source==='search'){state.ref=null;}
+      els.coords.textContent='';
+      renderList();updateStatus();
+      announce('已显示全部路标');
+    });
+    on(els.backTop,'click',closeDetail);
+    on(els.backBottom,'click',closeDetail);
+    on(els.detailListen,'click',function(){
+      if(state.selectedId) toggleListen(state.selectedId,els.detailListen);
+    });
+    on(els.detailInaccurate,'click',function(){
+      if(state.selectedId) openConfirm(state.selectedId,els.detailInaccurate,'inaccurate');
+    });
+    on(els.detailAccurate,'click',function(){
+      if(state.selectedId) openConfirm(state.selectedId,els.detailAccurate,'accurate');
+    });
+    on(els.modalConfirm,'click',onConfirmClick);
+    on(els.modalCancel,'click',closeConfirm);
+    on(els.zoomIn,'click',function(){
+      setScale(state.viewerScale+0.5);
+      announce('已放大到 '+fmtScale(state.viewerScale)+' 倍');
+    });
+    on(els.zoomOut,'click',function(){
+      setScale(state.viewerScale-0.5);
+      announce('已缩小到 '+fmtScale(state.viewerScale)+' 倍');
+    });
+    on(els.zoomClose,'click',closeViewer);
+    on(els.viewerStage,'touchstart',onTouchStart,{passive:true});
+    on(els.viewerStage,'touchmove',onTouchMove,{passive:false});
+    on(els.viewerStage,'touchend',onTouchEnd,{passive:true});
+    on(els.viewerStage,'touchcancel',onTouchEnd,{passive:true});
+    on(document,'keydown',onKeydown);
+    on(document,'click',onDocClick,true);
+    on(document,'click',onDocClickAudio,true);
+    on(document,'focusin',onFocusIn);
+    on(document,'visibilitychange',onVisibilityChange);
+    on(window,'pagehide',onPageHide);
+  }
+
+  /* ---------- 生命周期 ---------- */
+  async function init(){
+    if(state.initialized) return;
+    state.initialized=true;
+    state.destroyed=false;
+    state.detailOpen=false;
+    state.selectedId=null;
+    state.query='';
+    state.locateFailed=false;
+    state.ref=null;
+    state.ready=null;
+    state.playing=null;
+    state.pendingMode=null;
+    if(state.accurate) state.accurate.clear();
+    state.audioMode=loadAudioMode();
+
+    cacheEls();
+    applyStaticCopy();
+    applyTheme(loadTheme(),false);
+    bindEvents();
+    renderIdentity();
+
+    // 服务器模式预留：API.base 非 'local' 时改走 fetch（TODO：接入后端后替换数据层实现）
+    BambooDB.API.setBase(CONFIG.apiBase);
+
+    els.status.textContent='正在加载路标…';
+    try{
+      state.marks=await BambooDB.listMarks({state:'published'});
+    }catch(e){
+      state.marks=[];
+    }
+    renderList();
+    updateStatus();
+    locate();
+  }
+
+  function destroy(){
+    state.destroyed=true;
+    state.initialized=false;
+    if(announceTimer){clearTimeout(announceTimer);announceTimer=null;}
+    if(geoGuard){clearTimeout(geoGuard);geoGuard=null;}
+    stopPlayback(false);
+    state.ready=null;
+    try{window.speechSynthesis.cancel();}catch(e){}
+    listeners.splice(0).forEach(function(item){
+      try{item[0].removeEventListener(item[1],item[2],item[3]);}catch(e){}
+    });
+    revokeReg(cardReg);
+    revokeReg(detailReg);
+    if(els.modal) els.modal.hidden=true;
+    if(els.audioModal) els.audioModal.hidden=true;
+    if(els.modeConfirm) els.modeConfirm.hidden=true;
+    if(els.viewer) els.viewer.hidden=true;
+    if(els.viewerStage) els.viewerStage.textContent='';
+    document.body.classList.remove('lowvis-locked');
+    state.playing=null;
+    state.ready=null;
+    state.audioModePrompt=null;
+    state.pendingMode=null;
+    if(state.accurate) state.accurate.clear();
+    state.selectedId=null;
+    state.detailOpen=false;
+  }
+
+  window.BambooLowvis={init:init,destroy:destroy};
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){init();});
+  }else{
+    init();
+  }
+})();
+</script>
+
+<!-- 👉 要插图就去掉下行注释，换成你的图片文件名 -->
+<!-- <img src="你的图片.jpg" alt="图片说明" style="width:100%"> -->
+
+<!--
+【修改说明】
+1. 改文字：打开本文件 <script> 顶部 CONFIG，所有界面文案（含标题、按钮、播报、弹窗、
+   身份切换链接）都集中在那里；盲道状态文案在 blindLabel。
+2. 改字号 / 配色：只改 <style> 顶部 :root 变量；常规档在 html.lv-regular 里。
+   大字高对比档：正文 22px、标题 30px、按钮 72px；常规档：正文 20px、标题 26px、按钮 56px。
+3. 接后端：把 CONFIG.apiBase 改成服务器地址（如 https://api.example.com/bamboo），
+   然后在 BambooDB 的 load / persist / listMarks / saveMark / markInaccurate / getMedia
+   内换成 fetch（数据层函数名与签名保持不变，便于四端合并）。
+4. 换照片：用户真实照片走 IndexedDB（BambooDB.putMedia 写入，getMedia 读出，
+   用 URL.createObjectURL 显示）；种子数据 mediaKey 为 null，显示「演示图片」占位色块。
+   若想在页面固定一张示意图，用上方那条注释掉的 <img> 模板，并务必写清 alt。
+5. 身份切换四链接：CONFIG.identityLinks 一处集中修改（将来换成内部路由）。
+6. 本端只消费 state==='published' 的路标；「标记不准」调用 BambooDB.markInaccurate，
+   会按公共状态机把该条 state 改回 'queue' 并累计 usage.inaccurate；
+   「标记准确」不改变 state，用 BambooDB.updateMark 累加 usage.confirm（同一条本次会话只计一次），
+   两个按钮共用同一个大字确认弹窗（标题/说明随按钮变化，焦点与关闭返回逻辑相同）。
+7. 本地存储键：app_bamboo_marks / app_bamboo_media(IndexedDB) /
+   app_bamboo_settings（常规·高对比选择，本次已按「local + 后端未定」生成）。
+8. 第1问答案：数据模式 = local；第2问记录：后端技术计划 = 还没定（CONFIG.backendPlan）。
+9. 定位成功时顶部显示「已定位：当前位置 ｜ 附近 N 条路标」：单文件离线无法做反向地理编码，
+   地名固定为 CONFIG.locatePlaceName（当前位置），坐标单独一行显示；接后端后可换成逆地理结果。
+10. 声音明信片按约定不做，列表尾部只保留「声音明信片：即将上线」占位（CONFIG.soonText）。
+11. 与系统读屏的协调（重要）：浏览器没有「检测读屏 / 让出音频焦点 / 暂停系统朗读」的 API，
+    任何定时等待都只是猜。本页因此改成三件可验证的事：
+    (1) 第一次播放前问一次「读屏优先 / 扬声器」，选完还要点一次「是否确定？」才保存
+        （只在第一次出现；之后改播放方式不再二次确认），选择存 app_bamboo_settings.audioMode，
+        顶栏「播放方式」可随时改；读屏优先时本页完全不调用 speechSynthesis，
+        种子条目改为把焦点移到「志愿者原声文字稿」让读屏朗读；
+    (2) 扬声器模式下每次播放都按两次：第一次只进入「已就绪」并用 aria-live 提示，
+        等读屏把这句念完再按第二次，用人工确认代替定时器；
+    (3) 播放期间不写 aria-live（否则读屏会同时开口）；焦点离开播放按钮、点按页面其他位置、
+        按 Esc、切到后台，都会立即停止正在播放的音频。
+12. 本端种子：BM0001～BM0014 共 14 条（published 8 条在列表显示），合并式播种按 id 追加，
+    版本号存 app_bamboo_seed_ver；新增种子时把 SEED_VER 加 1 并在 👉 数组里追加。
+13. 端名对照（用户可见）：志愿者侧 = 竹小节（竹小节 · 采集）、全盲侧 = 竹语（竹语 · 读屏收听）、
+    本端 = 竹影（竹影 · 大字高对比）、审核侧 = 竹卫（竹卫 · 审核）；顶栏标题为「帮步 Bamboo · 竹影」。
+    当前页在「切换身份」里靠 aria-current 与反色底标示，链接文字不再追加「（当前）」。
+-->
+</body>
+</html>

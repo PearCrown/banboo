@@ -1,0 +1,1937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="帮步 Bamboo · 竹语：用系统读屏逐条收听志愿者上传的无障碍路标。">
+<title>帮步 Bamboo · 竹语</title>
+<style>
+:root{
+  /* 全盲端：黑底黄字最高对比（读屏用户视觉不重要，兜底显示） */
+  --bl-bg:#000000; --bl-fg:#FFD400; --bl-card:#111111;
+  --bl-line:#FFD400; --bl-focus:#FFFFFF;
+  --bl-fs-body:20px; --bl-fs-title:30px; --bl-btn-h:56px;
+}
+html{
+  background:var(--bl-bg); color:var(--bl-fg); color-scheme:dark;
+}
+body{
+  margin:0; padding:0;
+  background:var(--bl-bg); color:var(--bl-fg);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Heiti SC",sans-serif;
+  font-size:var(--bl-fs-body);
+  line-height:1.75;
+  -webkit-text-size-adjust:100%;
+  text-size-adjust:100%;
+  overflow-wrap:break-word;
+}
+h1,h2,h3,p,ul,ol,li,nav,section,header,main,footer{margin:0;padding:0}
+ul,ol{list-style:none}
+a{color:var(--bl-fg)}
+button,input{font-family:inherit}
+img{max-width:100%;height:auto}
+
+/* 焦点：必须醒目 */
+:focus-visible{outline:4px solid var(--bl-focus);outline-offset:3px}
+
+#view-blind{
+  max-width:820px;
+  margin:0 auto;
+  padding:16px 16px 56px;
+}
+
+/* 跳过导航（键盘/读屏可直接跳到列表） */
+.blind-skip{
+  position:absolute; left:-9999px; top:0; z-index:20;
+  display:inline-block;
+  padding:12px 18px;
+  background:var(--bl-fg); color:#000;
+  font-size:var(--bl-fs-body); font-weight:800;
+  text-decoration:none;
+  border-radius:0 0 10px 0;
+}
+.blind-skip:focus-visible{
+  position:fixed; left:0; top:0;
+}
+
+/* 顶栏 */
+.blind-header{
+  padding-bottom:16px;
+  border-bottom:2px solid var(--bl-line);
+}
+.blind-title{
+  font-size:var(--bl-fs-title);
+  line-height:1.3;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+.blind-subtitle{
+  margin-top:6px;
+  font-size:var(--bl-fs-body);
+}
+.blind-roles{margin-top:16px}
+.blind-roles-btn{margin-top:0}
+/* 收起时整块隐藏（要用 [hidden] 显式关掉，否则会被 display:grid 覆盖） */
+.blind-roles-list{
+  display:grid; gap:12px;
+  margin-top:12px;
+}
+.blind-roles-list[hidden]{display:none}
+.blind-role-link{
+  display:flex; align-items:center; justify-content:center;
+  width:100%;
+  min-height:var(--bl-btn-h);
+  padding:8px 18px;
+  border:2px solid var(--bl-line);
+  border-radius:10px;
+  background:var(--bl-card);
+  color:var(--bl-fg);
+  font-size:var(--bl-fs-body);
+  text-decoration:none;
+}
+.blind-role-link[aria-current="page"]{
+  border-style:dashed;
+  font-weight:800;
+}
+
+/* 进度 */
+.blind-progress{
+  margin-top:20px;
+  padding:14px 16px;
+  border:2px solid var(--bl-line);
+  border-radius:12px;
+  background:var(--bl-card);
+}
+.blind-progress-title{
+  font-size:var(--bl-fs-body);
+  font-weight:700;
+}
+.blind-progress-line{margin-top:6px}
+.blind-progress-value{
+  display:block;
+  font-size:var(--bl-fs-body);
+  font-weight:800;
+}
+
+/* 播报区（唯一动态播报出口） */
+.blind-live-wrap{
+  margin-top:16px;
+  padding:14px 16px;
+  border:2px solid var(--bl-line);
+  border-radius:12px;
+}
+.blind-live-title{
+  font-size:var(--bl-fs-body);
+  font-weight:700;
+}
+.blind-live{
+  margin-top:6px;
+  min-height:var(--bl-btn-h);
+  font-size:var(--bl-fs-body);
+}
+
+/* 定位 */
+.blind-locate{
+  margin-top:20px;
+  padding:14px 16px;
+  border:2px solid var(--bl-line);
+  border-radius:12px;
+}
+.blind-locate-title{
+  font-size:var(--bl-fs-body);
+  font-weight:700;
+}
+.blind-locate-text{
+  margin-top:6px;
+  font-size:var(--bl-fs-body);
+}
+.blind-dictation{margin-top:14px}
+.blind-label{
+  display:block;
+  margin-bottom:8px;
+  font-size:var(--bl-fs-body);
+  font-weight:700;
+}
+.blind-input{
+  display:block;
+  width:100%;
+  min-height:var(--bl-btn-h);
+  padding:8px 14px;
+  font-size:var(--bl-fs-body);
+  color:var(--bl-fg);
+  background:#000;
+  border:2px solid var(--bl-line);
+  border-radius:10px;
+}
+.blind-input::placeholder{color:var(--bl-fg);opacity:1}
+
+/* 按钮：一律原生 button */
+.blind-btn{
+  display:block;
+  width:100%;
+  min-height:var(--bl-btn-h);
+  padding:10px 16px;
+  font-size:var(--bl-fs-body);
+  font-weight:800;
+  line-height:1.4;
+  color:var(--bl-fg);
+  background:var(--bl-card);
+  border:2px solid var(--bl-line);
+  border-radius:10px;
+  cursor:pointer;
+}
+.blind-btn-primary{
+  background:var(--bl-fg);
+  color:#000;
+  border-color:var(--bl-fg);
+}
+.blind-query{margin-top:12px}
+
+/* 语音查地点（不放打字输入） */
+.blind-voice{margin-top:16px}
+.blind-voice-hint{margin-bottom:12px;font-size:var(--bl-fs-body)}
+.blind-voice-btn{border-style:dashed}
+.blind-voice-all{margin-top:12px}
+
+/* 列表 */
+.blind-list-wrap{margin-top:24px}
+.blind-list-h{
+  font-size:calc(var(--bl-fs-body) + 2px);
+  font-weight:800;
+}
+.blind-list{margin-top:14px}
+.blind-empty{
+  margin-top:14px;
+  padding:14px 16px;
+  border:2px dashed var(--bl-line);
+  border-radius:12px;
+  font-size:var(--bl-fs-body);
+}
+
+.blind-item{
+  margin-bottom:24px;
+  padding:16px;
+  background:var(--bl-card);
+  border:2px solid var(--bl-line);
+  border-radius:14px;
+}
+.blind-item-place{
+  font-size:calc(var(--bl-fs-body) + 4px);
+  font-weight:800;
+  line-height:1.4;
+}
+.blind-summary{
+  display:block;
+  width:100%;
+  margin-top:12px;
+  padding:12px 14px;
+  min-height:var(--bl-btn-h);
+  text-align:left;
+  font-size:var(--bl-fs-body);
+  font-weight:400;
+  line-height:1.7;
+  color:var(--bl-fg);
+  background:#000;
+  border:2px dashed var(--bl-line);
+  border-radius:10px;
+  cursor:pointer;
+}
+.blind-summary-line{display:block}
+.blind-summary-meta{font-weight:800}
+.blind-summary-text{margin-top:6px}
+.blind-badge{
+  display:inline-block;
+  margin-top:10px;
+  padding:2px 12px;
+  border:2px solid var(--bl-line);
+  border-radius:999px;
+  font-size:var(--bl-fs-body);
+  font-weight:700;
+}
+.blind-actions{
+  display:grid;
+  gap:12px;
+  margin-top:16px;
+}
+
+/* 「标记准确」是正向确认：边框加粗，和「标记不准」并排也能一眼区分 */
+.blind-accurate{border-width:3px}
+
+/* 播放方式（演示数据：合成语音 / 只用读屏念） */
+.blind-setting{
+  margin-top:28px;
+  padding:14px 16px;
+  border:2px solid var(--bl-line);
+  border-radius:12px;
+}
+.blind-setting-title{font-size:var(--bl-fs-body);font-weight:700}
+.blind-setting-text{margin-top:6px;font-size:var(--bl-fs-body)}
+.blind-setting-btn{margin-top:12px}
+
+/* 声音明信片占位 */
+.blind-postcard{
+  margin-top:28px;
+  padding:14px 16px;
+  border:2px dashed var(--bl-line);
+  border-radius:12px;
+}
+.blind-postcard-title{
+  font-size:var(--bl-fs-body);
+  font-weight:700;
+}
+.blind-postcard-text{
+  margin-top:6px;
+  font-size:var(--bl-fs-body);
+}
+
+/* 页脚 */
+.blind-footer{
+  margin-top:32px;
+  padding-top:16px;
+  border-top:2px solid var(--bl-line);
+}
+.blind-footer-text{
+  font-size:var(--bl-fs-body);
+}
+
+/* 播放用的 audio 元素不需要出现在界面上 */
+.blind-audio{display:none}
+
+/* 尊重系统「减少动态效果」：本端无动画，兜底关掉一切过渡/动画/平滑滚动 */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+    scroll-behavior:auto !important;
+  }
+}
+</style>
+</head>
+<body>
+<div role="note" style="position:relative;z-index:9999;padding:14px 18px;background:#fff1bf;color:#342800;font:600 16px/1.6 system-ui,sans-serif;border-bottom:2px solid #a47800">新版界面预览：当前路标、投稿和审核只保存在本机浏览器，未接入云端，请勿用于实际出行或正式投稿。<a href="../index.html" style="color:#173e2b;text-decoration:underline;margin-left:8px">返回云端正式版</a></div>
+
+<!-- 唯一根容器（四端合并时整体搬运；id 不可改） -->
+<div id="view-blind" class="view">
+
+  <a class="blind-skip" href="#blind-list-h">跳到路标列表</a>
+
+  <header class="blind-header">
+    <h1 class="blind-title">帮步 Bamboo · 竹语</h1>
+    <p class="blind-subtitle">竹语 · 逐条收听附近路标</p>
+
+    <!-- 👉 身份切换菜单：四端链接集中在这一处，将来换成内部路由。
+         默认收起，只显示「切换身份」按钮；按一下才展开四个身份。 -->
+    <nav id="blind-roles" class="blind-roles" aria-label="身份切换">
+      <button id="blind-roles-btn" class="blind-btn blind-roles-btn" type="button"
+              aria-expanded="false" aria-controls="blind-roles-list">切换身份</button>
+      <ul id="blind-roles-list" class="blind-roles-list" role="list" hidden>
+        <li><a class="blind-role-link" href="./volunteer.html">竹小节 · 采集</a></li>
+        <li><a class="blind-role-link" href="./blind.html" aria-current="page">竹语 · 读屏收听</a></li>
+        <li><a class="blind-role-link" href="./lowvis.html">竹影 · 大字高对比</a></li>
+        <li><a class="blind-role-link" href="./review.html">竹卫 · 审核</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="blind-main">
+
+    <!-- 顶部进度：读屏可聚焦、可跳过 -->
+    <section class="blind-progress" tabindex="0" aria-labelledby="blind-progress-h">
+      <h2 id="blind-progress-h" class="blind-progress-title">收听进度</h2>
+      <p class="blind-progress-line">
+        <span id="blind-progress-value" class="blind-progress-value"
+              aria-live="polite" aria-atomic="true">正在获取位置</span>
+      </p>
+    </section>
+
+    <!-- 唯一的动态播报出口（polite） -->
+    <section class="blind-live-wrap" aria-labelledby="blind-live-h">
+      <h2 id="blind-live-h" class="blind-live-title">当前提示</h2>
+      <p id="blind-live" class="blind-live" role="status" aria-live="polite" aria-atomic="true">页面已打开，正在准备附近的路标。</p>
+    </section>
+
+    <!-- 定位 / 语音查地点：本端不提供打字输入，全部走手机系统的语音识别 -->
+    <section class="blind-locate" aria-labelledby="blind-locate-h">
+      <h2 id="blind-locate-h" class="blind-locate-title">定位</h2>
+      <p id="blind-locate-text" class="blind-locate-text">正在获取您的位置，请稍候。</p>
+
+      <div id="blind-voice" class="blind-voice" hidden>
+        <p id="blind-voice-hint" class="blind-voice-hint">按下面的按钮，用嘴说出地名，比如「人民广场」。</p>
+        <button id="blind-voice-btn" class="blind-btn blind-voice-btn" type="button">说出地名</button>
+        <button id="blind-voice-all" class="blind-btn blind-voice-all" type="button">听附近全部路标</button>
+
+        <!-- 兜底（例如 iPhone 的 Safari 没有网页语音识别）：
+             引导用系统输入法上的麦克风键说话，仍然不需要键盘打字 -->
+        <form id="blind-dictation-form" class="blind-dictation" hidden>
+          <label class="blind-label" for="blind-dictation-input">用语音输入地名</label>
+          <input class="blind-input" id="blind-dictation-input" name="place" type="text"
+                 autocomplete="off" autocapitalize="off" spellcheck="false"
+                 enterkeyhint="search" placeholder="按输入法的麦克风键，用嘴说出地名">
+          <button class="blind-btn blind-btn-primary blind-query" type="submit">搜索这个地名</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- 路标列表 -->
+    <section class="blind-list-wrap" aria-labelledby="blind-list-h">
+      <h2 id="blind-list-h" class="blind-list-h" tabindex="-1">附近路标</h2>
+      <p id="blind-list-empty" class="blind-empty" tabindex="-1" hidden>附近暂时没有可以收听的已发布路标</p>
+      <ol id="blind-list" class="blind-list" role="list"></ol>
+    </section>
+
+    <!-- 播放方式：演示数据和读屏抢声音时，一键改成「读屏念全文」 -->
+    <section class="blind-setting" aria-labelledby="blind-setting-h">
+      <h2 id="blind-setting-h" class="blind-setting-title">播放方式</h2>
+      <p class="blind-setting-text">演示路标没有真实录音。如果播放时和读屏叠在一起，就切到「读屏念全文」，全程只有读屏一个声音。</p>
+      <button id="blind-speak-mode" class="blind-btn blind-setting-btn" type="button">演示数据的播放方式：合成语音</button>
+    </section>
+
+    <!-- 声音明信片：本端只放「即将上线」占位，不做功能 -->
+    <section class="blind-postcard" aria-labelledby="blind-postcard-h">
+      <h2 id="blind-postcard-h" class="blind-postcard-title">声音明信片</h2>
+      <p class="blind-postcard-text">声音明信片即将上线，敬请期待。</p>
+    </section>
+
+    <!-- 👉 要插图就去掉下行注释，换成你的图片文件名（本端不放装饰图，读屏听不到） -->
+    <!-- <img src="你的图片.jpg" alt="图片说明" style="width:100%"> -->
+
+  </main>
+
+  <footer class="blind-footer">
+    <p class="blind-footer-text">帮步 Bamboo · 竹语。本页数据保存在本机浏览器，不上传服务器。</p>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ===== 👉 【文字配置区】在这里改文字（这些文字是读屏念给用户听的） ===== */
+  const CONFIG={
+    appTitle:'帮步 Bamboo · 竹语',
+    apiBase:'local',               // ← 第1问答案写这里（local=数据存在本机浏览器）
+    locatedNear:'已定位到{place}，附近共{n}条路标',
+    locateFail:'定位未开启，您可以语音说出地点',
+    markSummary:'第{x}条，共{y}条：{place}，距离约{dist}，盲道{path}。内容：{text}',
+    btnListen:'听志愿者原声', btnStop:'停止播放',
+    btnInaccurate:'标记不准', btnSkip:'跳过这条',
+    btnAccurate:'标记准确',
+    accurateDone:'已确认「{place}」信息准确，谢谢您',
+    feedbackDone:'已收到您的反馈，这条路标将优先复核，感谢您',
+    demoPlaying:'演示数据，正在播放合成语音',
+    playDelaySec:8,                // ← 按下后至少等 8 秒
+    playQuietMs:5000,              // ← 读屏念完之后，再空 5 秒才出声（“念完 5 秒后再播”）
+    playMaxWaitSec:25,             // ← 最长只等 25 秒，避免一直不开始
+    demoSpeakMode:'tts',           // ← 演示数据默认「合成语音」；改成 'reader' 就只用读屏念（绝不会叠音）
+
+    /* —— 以下是补充文案，同样集中在这里，可以一起改 —— */
+    playWaiting:'正在准备播放：等读屏念完这段提示，再空{n}秒就开始；想取消就再按一次这个按钮',
+    demoReading:'演示数据，没有真实录音，下面用读屏念全文',
+    btnSpeakTts:'演示数据的播放方式：合成语音',
+    btnSpeakReader:'演示数据的播放方式：读屏念全文',
+    speakModeTts:'已切换成合成语音。播放前会等读屏念完提示再出声。',
+    speakModeReader:'已切换成读屏念全文。只用读屏一个声音，绝不会和读屏叠在一起。',
+    waitCanceled:'已取消播放',
+    btnCancelWait:'取消等待',
+    btnVoiceStart:'说出地名',
+    btnVoiceStop:'停止听，我说完了',
+    btnVoiceAll:'听附近全部路标',
+    showAll:'已显示全部{n}条路标',
+    voiceHint:'按「说出地名」按钮，用嘴说出地名，比如「人民广场」。',
+    voiceListening:'正在听，请说出地名',
+    voiceEmpty:'没有听清地名，请再说一次',
+    voiceFail:'语音识别没有成功，请再说一次',
+    voiceNoPerm:'麦克风没有打开。请在手机浏览器的设置里允许使用麦克风，或者用下面输入法上的麦克风键说话',
+    voiceUnsupported:'这台手机的浏览器不支持网页里的语音识别。请按一下输入框，再按输入法上的麦克风键，用嘴说出地名',
+    voiceStopped:'已停止收听',
+    voiceHintDictation:'请按输入法上的麦克风键，用嘴说出地名，说完会自动搜索。',
+    markSummaryNoDist:'第{x}条，共{y}条：{place}，距离未知。内容：{text}',
+    noPlace:'未命名点位',
+    noText:'暂无文字说明',
+    distUnknown:'未知',
+    demoBadge:'演示数据 · 原声占位',
+    progressText:'第{x}条 / 共{y}条',
+    progressEmpty:'共0条路标',
+    progressLocating:'正在获取位置',
+    locatedHint:'已按距离从近到远列出附近路标。',
+    coordPlace:'当前所在位置',
+    playEnd:'播放结束',
+    playFail:'这段原声暂时播放不了，请稍后再试，也可以先听摘要里的文字内容',
+    playMissing:'没有找到这段原声文件，改为朗读文字说明',
+    ttsUnavailable:'当前设备无法朗读演示语音，请用读屏阅读摘要里的文字内容',
+    textMissing:'这条路标暂时没有文字说明',
+    skipDone:'已跳过这条',
+    skipWrap:'已跳过这条，已经是最后一条，回到第1条',
+    skipOnly:'现在只有这一条路标，没有可以跳过的下一条',
+    summarySelect:'已选中{place}，下面是听志愿者原声按钮',
+    queryEmpty:'还没有听到地名，请再说一次',
+    queryResult:'听到「{kw}」，找到{n}条路标',
+    noMatch:'没有找到「{kw}」的路标，请再语音说一次别的说法',
+    emptyList:'附近暂时没有可以收听的已发布路标'
+  };
+
+  /* ===== 4.3 统一数据层（公共契约，逐字写入，函数名与行为不得改动） ===== */
+  const BambooDB=(()=>{
+    const LS='app_bamboo_marks', DBN='app_bamboo_media';
+    const API={ base:'local', setBase(b){this.base=b;} };
+    function load(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return[]}}
+    function persist(l){localStorage.setItem(LS,JSON.stringify(l))}
+    function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('media');
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);})}
+    async function putMedia(key,blob){const db=await idb();
+      return new Promise((res,rej)=>{const tx=db.transaction('media','readwrite');
+        tx.objectStore('media').put(blob,key); tx.oncomplete=()=>res(key);
+        tx.onerror=()=>rej(tx.error);})}
+    async function getMedia(key){const db=await idb();
+      return new Promise((res,rej)=>{const tx=db.transaction('media','readonly');
+        const rq=tx.objectStore('media').get(key);
+        rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);})}
+    function aiReview(m){
+      const flags=[];
+      if(!m.audio||!m.audio.duration||m.audio.duration<20)flags.push('录音时长不足');
+      if(m.blindPath&&m.blindPath.status==='未知')flags.push('盲道状态模糊');
+      if(!m.place||m.place.length<2)flags.push('点位名称不完整');
+      if(!m.audio||!m.audio.duration)flags.push('文字替代录音');
+      return{verdict:flags.length?'unsure':'pass',flags};
+    }
+    async function saveMark(m){
+      m.aiReview=aiReview(m);
+      m.state=m.aiReview.verdict==='pass'?'published':'queue';
+      m.humanReview={status:null,reviewer:null,tags:[],note:null,reviewedAt:null};
+      const l=load();const i=l.findIndex(x=>x.id===m.id);
+      if(i>-1){l[i]=m}else{m.usage=m.usage||{listens:0,confirm:0,inaccurate:0};l.unshift(m)}
+      persist(l);return m;
+    }
+    async function updateMark(id,patch){const l=load();const m=l.find(x=>x.id===id);
+      if(m){Object.assign(m,patch);persist(l)}return m}
+    async function listMarks(f){let l=load();
+      if(f&&f.state)l=l.filter(m=>m.state===f.state);return l}
+    async function markInaccurate(id){const l=load();const m=l.find(x=>x.id===id);
+      if(m&&m.state==='published'){m.usage.inaccurate++;
+        m.aiReview.flags=['视障用户反馈不准'];m.state='queue';persist(l)}return m}
+    return{API,load,persist,listMarks,saveMark,updateMark,markInaccurate,putMedia,getMedia};
+  })();
+  // 服务器模式预留：API.base 非 'local' 时改走 fetch，原型阶段仅写 TODO 注释。
+
+  /* ===== 4.4 种子数据（四端共用）====================================
+     本块集中管理种子数据，是全文件唯一允许改种子内容的地方：
+     · 新增条目写进下面的 ALL_SEEDS，并把 SEED_VER 加 1；
+     · 播种按 id 合并追加：老用户刷新后只会补上新条目，
+       绝不覆盖、绝不删除已存在的记录（用户真实提交/审核过的数据原样保留）。
+     ================================================================ */
+  const now=Date.now(),D=86400000;   // 种子时间基准：时间字段一律用 now-N*D 毫秒时间戳
+  const SEED_VER = 2;                // ← 每次新增种子 +1（老用户靠它触发合并追加）
+  const SEED_KEY = 'app_bamboo_marks';
+  const SEED_VER_KEY = 'app_bamboo_seed_ver';
+
+  // ════ 👉 在这里改种子数据（新增条目都写在这个数组里）════
+  const ALL_SEEDS = [
+     {id:'BM0001',place:'地铁2号线C口无障碍电梯',lat:31.2323,lng:121.4691,
+      submittedAt:now-3*D,vol:{anonId:'竹小节A1024',zhuli:36},
+      audio:{mediaKey:null,duration:42,aiText:'电梯在C口右手边约五米，入口有触觉提示砖，轿厢语音报层清晰，出电梯右转即是盲道。'},
+      photo:{mediaKey:null,aiText:'垂直电梯一部，门框有黄色提示条'},
+      blindPath:{status:'畅通',checkedAt:now-3*D},
+      aiReview:{verdict:'pass',flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:12,confirm:5,inaccurate:0},state:'published'},
+     {id:'BM0002',place:'人民广场东南角盲道',lat:31.2304,lng:121.4737,
+      submittedAt:now-2*D,vol:{anonId:'竹小节B2077',zhuli:18},
+      audio:{mediaKey:null,duration:35,aiText:'东南角共享单车常压占盲道约十米，绕行请靠右侧花坛边缘。'},
+      photo:{mediaKey:null,aiText:'盲道上停有多辆共享单车'},
+      blindPath:{status:'被占用',checkedAt:now-2*D},
+      aiReview:{verdict:'pass',flags:[]},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:8,confirm:2,inaccurate:0},state:'published'},
+     {id:'BM0003',place:'天桥下中山北路口',lat:31.2341,lng:121.4712,
+      submittedAt:now-1*D,vol:{anonId:'竹小节A1024',zhuli:36},
+      audio:{mediaKey:null,duration:12,aiText:'路口……（此处录音过短）'},
+      photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-1*D},
+      aiReview:{verdict:'unsure',flags:['录音时长不足']},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
+     {id:'BM0004',place:'公交17路站台',lat:31.2287,lng:121.4750,
+      submittedAt:now-1*D,vol:{anonId:'竹小节B2077',zhuli:18},
+      audio:{mediaKey:null,duration:28,aiText:'站台有无障碍坡道，候车椅在头节车厢对应位置。'},
+      photo:{mediaKey:null,aiText:'站台照壁为广告灯箱'},
+      blindPath:{status:'部分破损',checkedAt:now-1*D},
+      aiReview:{verdict:'unsure',flags:['描述与图片不一致']},
+      humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'queue'},
+     {id:'BM0005',place:'医院北门坡道',lat:31.2350,lng:121.4668,
+      submittedAt:now-5*D,vol:{anonId:'竹小节A1024',zhuli:36},
+      audio:{mediaKey:null,duration:22,aiText:'北门坡道较陡，两侧有双层扶手。'},
+      photo:{mediaKey:null,aiText:null},blindPath:{status:'畅通',checkedAt:now-5*D},
+      aiReview:{verdict:'unsure',flags:['录音时长不足']},
+      humanReview:{status:'returned',reviewer:'审核员R01',
+        tags:['录音听不清'],note:'风声盖过人声，请靠近话筒或到避风处重录。',
+        reviewedAt:now-4*D},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'returned'},
+     {id:'BM0006',place:'学校东门',lat:31.2295,lng:121.4680,
+      submittedAt:now-6*D,vol:{anonId:'竹小节B2077',zhuli:18},
+      audio:{mediaKey:null,duration:31,aiText:'东门放学时段人流量大，门内左侧有休息座椅。'},
+      photo:{mediaKey:null,aiText:'画面中有多名学生人脸'},
+      blindPath:{status:'未知',checkedAt:now-6*D},
+      aiReview:{verdict:'unsure',flags:['疑似含隐私']},
+      humanReview:{status:'rejected',reviewer:'审核员R01',
+        tags:['疑似含隐私'],note:'画面含学生人脸，请重新拍摄避开人脸。',
+        reviewedAt:now-6*D},
+      usage:{listens:0,confirm:0,inaccurate:0},state:'rejected'},
+    // ---------- 新增 8 条：BM0007～BM0014 ----------
+    // 6 条 published（本端可见）+ 1 条 hidden + 1 条 queue（本端不可见，用来验证过滤）
+    {id:'BM0007',place:'地铁1号线2号口',lat:31.2338,lng:121.4732,
+     submittedAt:now-2*D,vol:{anonId:'竹小节C3001',zhuli:24},
+     audio:{mediaKey:null,duration:38,aiText:'2号口在商场一层，进门后左手边就是扶梯，扶手外侧有一排触觉提示砖。扶梯口地面平整，台阶边沿刷了黄漆，雨天地砖容易打滑，走的时候慢一点。'},
+     photo:{mediaKey:null,aiText:'商场一层的自动扶梯，入口处铺有黄色触觉砖'},
+     blindPath:{status:'畅通',checkedAt:now-2*D},
+     aiReview:{verdict:'pass',score:91,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:21,confirm:7,inaccurate:0},state:'published'},
+    {id:'BM0008',place:'人民广场地下通道',lat:31.2309,lng:121.4705,
+     submittedAt:now-3*D,vol:{anonId:'竹小节C3002',zhuli:31},
+     audio:{mediaKey:null,duration:41,aiText:'通道中间停了四五辆共享单车，横着占了大约三米，右边只剩半米宽的缝。头顶灯偏暗，地面有一段积水，靠左侧墙边的盲道走过去更稳当。'},
+     photo:{mediaKey:null,aiText:'地下通道里横向停着一排共享单车'},
+     blindPath:{status:'被占用',checkedAt:now-3*D},
+     aiReview:{verdict:'pass',score:78,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:14,confirm:4,inaccurate:2},state:'published'},
+    {id:'BM0009',place:'南京西路成都路口',lat:31.2280,lng:121.4612,
+     submittedAt:now-5*D,vol:{anonId:'竹小节D4001',zhuli:17},
+     audio:{mediaKey:null,duration:36,aiText:'路口西北角的人行道砖有三四块松动，踩上去会翘边，靠花坛一侧的盲道断了两米。路口右转车不少，绿灯时间偏短，等灯时站在路缘石后面。'},
+     photo:{mediaKey:null,aiText:'人行道砖松动，靠花坛一侧的盲道断开'},
+     blindPath:{status:'部分破损',checkedAt:now-5*D},
+     aiReview:{verdict:'pass',score:84,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:9,confirm:3,inaccurate:1},state:'published'},
+    {id:'BM0010',place:'延安东路天桥',lat:31.2362,lng:121.4675,
+     submittedAt:now-7*D,vol:{anonId:'竹小节D4002',zhuli:29},
+     audio:{mediaKey:null,duration:44,aiText:'天桥南侧上桥有十四级台阶，扶手是圆的，比较滑。桥面铺了防滑胶垫，靠东边两米的地方有一处缺口，桥头有没有铺盲道，目前还没有确认。'},
+     photo:{mediaKey:null,aiText:'天桥南侧的台阶与圆形扶手'},
+     blindPath:{status:'未知',checkedAt:now-7*D},
+     aiReview:{verdict:'pass',score:72,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:6,confirm:2,inaccurate:1},state:'published'},
+    {id:'BM0011',place:'黄陂南路菜场入口',lat:31.2251,lng:121.4748,
+     submittedAt:now-9*D,vol:{anonId:'竹小节E5001',zhuli:12},
+     audio:{mediaKey:null,duration:33,aiText:'菜场入口在弄堂口右手边三米，门口铺了整块水泥地，比较平。早上七点到九点人最多，门口常摆两个塑料筐，摊位前面的盲道还能走过去。'},
+     photo:{mediaKey:null,aiText:'菜场入口的水泥地面和门口摆放的塑料筐'},
+     blindPath:{status:'畅通',checkedAt:now-9*D},
+     aiReview:{verdict:'pass',score:88,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:17,confirm:5,inaccurate:0},state:'published'},
+    {id:'BM0012',place:'长征医院门诊门口',lat:31.2318,lng:121.4631,
+     submittedAt:now-12*D,vol:{anonId:'竹小节C3003',zhuli:34},
+     audio:{mediaKey:null,duration:39,aiText:'门诊门口停了两排电动车，最外面一辆压住盲道约一米半。门口有斜坡，坡度不大，雨天会积水，旋转门旁边还有一扇一直开着的侧门。'},
+     photo:{mediaKey:null,aiText:'医院门诊门口的电动车与无障碍斜坡'},
+     blindPath:{status:'被占用',checkedAt:now-12*D},
+     aiReview:{verdict:'pass',score:76,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:11,confirm:4,inaccurate:2},state:'published'},
+    {id:'BM0013',place:'西藏中路公交站',lat:31.2375,lng:121.4755,
+     submittedAt:now-15*D,vol:{anonId:'竹小节F6001',zhuli:41},
+     audio:{mediaKey:null,duration:37,aiText:'站台在路口北侧，候车区有顶棚，长椅在站牌右边。站台边沿有一段没护栏，公交车进站时离站台很近，站台前的地面盲道铺得不太连续。'},
+     photo:{mediaKey:null,aiText:'公交站台与候车顶棚'},
+     blindPath:{status:'未知',checkedAt:now-15*D},
+     aiReview:{verdict:'pass',score:86,flags:[]},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:23,confirm:8,inaccurate:1},state:'hidden'},
+    {id:'BM0014',place:'福州路便利店路口',lat:31.2263,lng:121.4669,
+     submittedAt:now-18*D,vol:{anonId:'竹小节D4003',zhuli:21},
+     audio:{mediaKey:null,duration:19,aiText:'便利店门口有三级台阶，最上面一级的边角缺了一块。门口人行道砖大面积起砂，推箱子容易卡住，路口转角的提示砖也缺了两块，路面颜色比周围深。'},
+     photo:{mediaKey:null,aiText:'便利店门口的台阶与起砂的人行道砖'},
+     blindPath:{status:'部分破损',checkedAt:now-18*D},
+     aiReview:{verdict:'unsure',score:52,flags:['录音时长不足']},
+     humanReview:{status:null,reviewer:null,tags:[],note:null,reviewedAt:null},
+     usage:{listens:0,confirm:0,inaccurate:0},state:'queue'}
+  ];
+  // ════ 👉 种子数据结束 ════
+
+  /* 播种：按 id 合并追加，已有旧数据的老用户也能拿到新种子 */
+  function seedIfNeeded(){
+    let marks = [];
+    try { marks = JSON.parse(localStorage.getItem(SEED_KEY) || '[]'); } catch (e) { marks = []; }
+    if (!Array.isArray(marks)) marks = [];
+
+    if (marks.length === 0) {
+      // 1. 全新浏览器：一次写入全部种子（原 6 条 + 新 8 条）
+      localStorage.setItem(SEED_KEY, JSON.stringify(ALL_SEEDS));
+    } else {
+      // 2. 已有数据：种子版本旧 → 只补 id 不存在的条目，不覆盖、不删除
+      const ver = Number(localStorage.getItem(SEED_VER_KEY) || 0) || 0;
+      if (ver < SEED_VER) {
+        const have = new Set(marks.map(function (m) { return m && m.id; }));
+        const add = ALL_SEEDS.filter(function (s) { return s && !have.has(s.id); });
+        if (add.length) {
+          for (let i = 0; i < add.length; i++) marks.push(add[i]);
+          localStorage.setItem(SEED_KEY, JSON.stringify(marks));
+        }
+      }
+    }
+
+    // 3. 记下种子版本，下次升版本时才知道要不要补
+    localStorage.setItem(SEED_VER_KEY, String(SEED_VER));
+  }
+  seedIfNeeded();
+  // 种子条目 mediaKey 为 null：播原声时显示「演示数据 · 原声占位」，
+  // 用 speechSynthesis 朗读 aiText 代替（仅种子条目允许）。
+
+  /* =====================================================================
+     以下为本端页面逻辑（全盲端专属）。
+     读屏优先：只做「语义结构 + 焦点管理」，不自研 TTS、不做常驻播报。
+     ===================================================================== */
+
+  /* ---------- 小工具 ---------- */
+  function $(id) { return document.getElementById(id); }
+
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fill(tpl, vars) {
+    return String(tpl == null ? '' : tpl).replace(/\{(\w+)\}/g, function (m, k) {
+      return Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m;
+    });
+  }
+
+  /* ---------- 状态 ---------- */
+  const S = {
+    inited: false,
+    destroyed: false,
+    items: [],              // [{mark, dist}]，dist 为 null 表示距离未知
+    pos: null,              // {lat,lng}
+    mode: 'locating',       // 'locating' | 'located' | 'voice'
+    keyword: '',
+    currentIndex: 0,
+    geoDone: false,
+    playToken: 0,
+    playingId: null,        // 正在播放的路标 id
+    pendingId: null,        // 正在等读屏说完、准备播放的路标 id
+    pendingItem: null,
+    pendingMode: '',        // 'tts' 合成语音 / 'audio' 真实录音
+    pendingStartAt: 0,
+    pendingTimer: null,     // 等待轮询定时器
+    demoSpeak: 'tts',       // 演示数据播放方式：'tts' 合成语音 / 'reader' 只用读屏念
+    lastLiveAt: 0,          // 上一条播报写进 aria-live 的时刻
+    speechEndAt: 0,         // 预估读屏把这一轮念完的时刻（之后再空 playQuietMs 才出声）
+    heldProgress: null,     // 播放中被压住的进度播报
+    recognizing: false,     // 语音识别中
+    recognition: null,
+    inputTimer: null,       // 语音输入兜底框的自动搜索防抖
+    ttsOn: false,
+    audioEl: null,
+    audioUrl: null,
+    timers: [],
+    liveTimer: null,
+    progressTimer: null,
+    handlers: null
+  };
+
+  /* ---------- 距离（haversine） ---------- */
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * toRad;
+    const dLng = (lng2 - lng1) * toRad;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+  }
+
+  function formatDist(meters) {
+    const d = Number(meters);
+    if (!isFinite(d) || d < 0) return CONFIG.distUnknown;
+    if (d < 1000) {
+      const r = Math.max(10, Math.round(d / 10) * 10);
+      return r + '米';
+    }
+    const km = Math.round(d / 100) / 10;
+    return (km % 1 === 0 ? km.toFixed(0) : km.toFixed(1)) + '公里';
+  }
+
+  /* ---------- 文案 ---------- */
+  function pathText(m) {
+    return (m && m.blindPath && m.blindPath.status) ? String(m.blindPath.status) : '未知';
+  }
+
+  function isRealAudio(m) {
+    return !!(m && m.audio && m.audio.mediaKey);
+  }
+
+  function snippet(text) {
+    const s = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!s) return CONFIG.noText;
+    return s.length > 80 ? s.slice(0, 80) + '…' : s;
+  }
+
+  function summaryLabel(item, index, total) {
+    const m = item.mark;
+    const vars = {
+      x: index + 1,
+      y: total,
+      place: m.place || CONFIG.noPlace,
+      dist: item.dist == null ? CONFIG.distUnknown : formatDist(item.dist),
+      path: pathText(m),
+      text: snippet(m.audio && m.audio.aiText)
+    };
+    return fill(item.dist == null ? CONFIG.markSummaryNoDist : CONFIG.markSummary, vars);
+  }
+
+  /* ---------- 播报（唯一出口，一律 polite，排队不互相打断） ---------- */
+  const liveQueue = [];
+  let liveBusy = false;
+
+  function announce(text) {
+    const el = $('blind-live');
+    if (!el || !text || S.destroyed) return;
+    liveQueue.push(String(text));
+    while (liveQueue.length > 3) liveQueue.shift();  // 只保留最近 3 条，避免播报积压过时
+    if (S.playingId) return;                          // 播放中先不出声，播完再念
+    pumpLive();
+  }
+
+  function pumpLive() {
+    if (liveBusy) return;
+    const el = $('blind-live');
+    if (!el || S.destroyed) { liveQueue.length = 0; return; }
+    if (S.playingId) return;                          // 播放中不开口，避免和音频叠在一起
+    const msg = liveQueue.shift();
+    if (msg === undefined) return;
+    liveBusy = true;
+    if (S.liveTimer) { clearTimeout(S.liveTimer); S.liveTimer = null; }
+    // 内容相同也要重播一次：先清空再写入
+    if (el.textContent === msg) el.textContent = '';
+    S.liveTimer = setTimeout(function () {
+      const hold = Math.min(12000, 800 + msg.length * 140);  // 这句大概要念多久
+      el.textContent = msg;
+      S.lastLiveAt = Date.now();                             // 读屏从现在开始念这句
+      S.speechEndAt = S.lastLiveAt + hold;                   // 预计念完的时刻
+      S.liveTimer = setTimeout(function () {
+        S.liveTimer = null;
+        liveBusy = false;
+        if (!S.destroyed) pumpLive();
+      }, hold);
+    }, 60);
+  }
+
+  /* 播放结束/取消后，把压住的播报放出来 */
+  function releaseLive() {
+    if (S.heldProgress != null) {
+      const t = S.heldProgress;
+      S.heldProgress = null;
+      setProgressText(t, 0);
+    }
+    if (!S.playingId && !S.destroyed) pumpLive();
+  }
+
+  function setProgressText(text, delayMs) {
+    const el = $('blind-progress-value');
+    if (!el) return;
+    if (S.playingId) { S.heldProgress = text; return; }   // 播放中先不念进度
+    if (S.progressTimer) { clearTimeout(S.progressTimer); S.progressTimer = null; }
+    const apply = function () {
+      if (el.textContent !== text) el.textContent = text;
+      S.progressTimer = null;
+    };
+    if (delayMs && delayMs > 0) {
+      S.progressTimer = setTimeout(apply, delayMs);
+    } else {
+      apply();
+    }
+  }
+
+  function setLocateText(text) {
+    const el = $('blind-locate-text');
+    if (el) el.textContent = String(text);
+  }
+
+  function showVoiceSearch() {
+    const box = $('blind-voice');
+    const hint = $('blind-voice-hint');
+    const allBtn = $('blind-voice-all');
+    if (hint) hint.textContent = CONFIG.voiceHint;
+    if (allBtn) {
+      allBtn.textContent = CONFIG.btnVoiceAll;
+      allBtn.setAttribute('aria-label', CONFIG.btnVoiceAll);
+    }
+    if (box) box.hidden = false;
+  }
+
+  /* 听完某个地名后，可以一键回到「全部路标」（也不需要打字） */
+  function showAllMarks() {
+    S.keyword = '';
+    const input = $('blind-dictation-input');
+    if (input) input.value = '';
+    buildList();
+    render(0);
+    if (!S.items.length) announce(CONFIG.emptyList);
+    else announce(fill(CONFIG.showAll, { n: S.items.length }));
+  }
+
+  function hideVoiceSearch() {
+    const box = $('blind-voice');
+    const form = $('blind-dictation-form');
+    if (box) box.hidden = true;
+    if (form) form.hidden = true;
+  }
+
+  /* ---------- 语音找地点（对接手机系统的语音识别，不做打字输入） ---------- */
+  function setVoiceBtn(listening) {
+    const btn = $('blind-voice-btn');
+    if (!btn) return;
+    const label = listening ? CONFIG.btnVoiceStop : CONFIG.btnVoiceStart;
+    btn.textContent = label;
+    btn.setAttribute('aria-label', label);
+  }
+
+  function stopVoiceInput(silent) {
+    const rec = S.recognition;
+    S.recognition = null;
+    S.recognizing = false;
+    if (rec && typeof rec.abort === 'function') {
+      try { rec.abort(); } catch (e) { /* 忽略 */ }
+    }
+    setVoiceBtn(false);
+    if (!silent) announce(CONFIG.voiceStopped);
+  }
+
+  function startVoiceInput() {
+    if (S.recognizing) { stopVoiceInput(false); return; }
+
+    const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Ctor) { showDictationFallback(CONFIG.voiceUnsupported); return; }
+
+    let rec = null;
+    try { rec = new Ctor(); } catch (e) { rec = null; }
+    if (!rec) { showDictationFallback(CONFIG.voiceUnsupported); return; }
+
+    rec.lang = 'zh-CN';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.continuous = false;
+
+    rec.onresult = function (ev) {
+      let text = '';
+      try { text = ev.results[0][0].transcript || ''; } catch (e) { text = ''; }
+      text = String(text).replace(/[。，、,.!?！？；;：:\s「」“”"'']/g, '').trim();
+      if (!text) { announce(CONFIG.voiceEmpty); return; }
+      applyKeyword(text);
+    };
+    rec.onerror = function (ev) {
+      const code = ev && ev.error ? String(ev.error) : '';
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        showDictationFallback(CONFIG.voiceNoPerm);
+      } else if (code === 'no-speech' || code === 'audio-capture') {
+        announce(CONFIG.voiceEmpty);
+      } else {
+        announce(CONFIG.voiceFail);
+      }
+    };
+    rec.onend = function () {
+      S.recognizing = false;
+      S.recognition = null;
+      setVoiceBtn(false);
+    };
+
+    S.recognition = rec;
+    S.recognizing = true;
+    setVoiceBtn(true);
+    announce(CONFIG.voiceListening);
+    try {
+      rec.start();
+    } catch (e) {
+      S.recognition = null;
+      S.recognizing = false;
+      setVoiceBtn(false);
+      announce(CONFIG.voiceFail);
+    }
+  }
+
+  /* 浏览器没有网页语音识别时（例如 iPhone Safari）：引导用系统输入法的麦克风键，
+     仍然不需要键盘打字；输入内容会自动搜索，不用再按按钮。 */
+  function showDictationFallback(msg) {
+    const form = $('blind-dictation-form');
+    const hint = $('blind-voice-hint');
+    if (!form) return;
+    form.hidden = false;
+    if (hint) hint.textContent = CONFIG.voiceHintDictation;
+    stopVoiceInput(true);
+    if (msg) announce(msg);
+    const input = $('blind-dictation-input');
+    if (input && typeof input.focus === 'function') {
+      try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+    }
+  }
+
+  /* 语音/听写拿到的地名 → 过滤列表 */
+  function applyKeyword(kw) {
+    const keyword = String(kw == null ? '' : kw).trim();
+    if (!keyword) { announce(CONFIG.queryEmpty); return; }
+    S.keyword = keyword;
+    buildList();
+    render(0);
+    if (!S.items.length) {
+      announce(fill(CONFIG.noMatch, { kw: keyword }));
+    } else {
+      announce(fill(CONFIG.queryResult, { kw: keyword, n: S.items.length }));
+    }
+  }
+
+  function onQuery(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const input = $('blind-dictation-input');
+    const val = input ? String(input.value || '').trim() : '';
+    applyKeyword(val);
+  }
+
+  /* 听写输入时自动搜索（不需要再点按钮） */
+  function onDictationInput() {
+    const input = $('blind-dictation-input');
+    if (!input) return;
+    if (S.inputTimer) { clearTimeout(S.inputTimer); S.inputTimer = null; }
+    const val = String(input.value || '').trim();
+    if (val.length < 2) return;
+    S.inputTimer = setTimeout(function () {
+      S.inputTimer = null;
+      if (S.destroyed) return;
+      applyKeyword(val);
+    }, 1500);
+  }
+
+  /* ---------- 列表数据 ---------- */
+  function publishedMarks() {
+    let all = [];
+    try { all = BambooDB.load(); } catch (e) { all = []; }
+    if (!Array.isArray(all)) all = [];
+    // 本端只消费 state==='published'（公共契约 4.1 / 4.2）
+    return all.filter(function (m) { return m && m.state === 'published'; });
+  }
+
+  function buildList() {
+    let list = publishedMarks().map(function (m) {
+      let dist = null;
+      if (S.pos && isFinite(Number(m.lat)) && isFinite(Number(m.lng))) {
+        dist = haversine(S.pos.lat, S.pos.lng, Number(m.lat), Number(m.lng));
+      }
+      return { mark: m, dist: dist };
+    });
+    if (S.keyword) {
+      list = list.filter(function (it) {
+        return String(it.mark.place || '').indexOf(S.keyword) > -1;
+      });
+    }
+    if (S.pos) {
+      list.sort(function (a, b) {
+        return (a.dist == null ? Infinity : a.dist) - (b.dist == null ? Infinity : b.dist);
+      });
+    } else {
+      list.sort(function (a, b) {
+        return String(a.mark.place || '').localeCompare(String(b.mark.place || ''), 'zh-Hans-CN');
+      });
+    }
+    S.items = list;
+    S.currentIndex = 0;
+    return list;
+  }
+
+  /* ---------- 列表渲染（DOM 顺序 = 读屏朗读顺序） ---------- */
+  function mkBtn(act, label, place, extraClass) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'blind-btn blind-act' + (extraClass ? ' ' + extraClass : '');
+    b.dataset.act = act;
+    b.textContent = label;
+    b.setAttribute('aria-label', place ? label + '：' + place : label);
+    return b;
+  }
+
+  function buildItem(item, index, total) {
+    const m = item.mark;
+    const place = m.place || CONFIG.noPlace;
+
+    const li = document.createElement('li');
+    li.className = 'blind-item';
+    li.dataset.index = String(index);
+    li.dataset.id = String(m.id);
+
+    // ① 摘要（标题 + 可聚焦摘要按钮，aria-label 是完整摘要）
+    const h = document.createElement('h3');
+    h.className = 'blind-item-place';
+    h.id = 'blind-place-' + m.id;
+    h.textContent = place;
+
+    const sum = document.createElement('button');
+    sum.type = 'button';
+    sum.className = 'blind-summary';
+    sum.dataset.act = 'summary';
+    sum.setAttribute('aria-label', summaryLabel(item, index, total));
+
+    const meta = item.dist == null
+      ? '距离未知 · 盲道' + pathText(m)
+      : '距离约' + formatDist(item.dist) + ' · 盲道' + pathText(m);
+    const parts = [
+      '<span class="blind-summary-line blind-summary-meta">' + esc(meta) + '</span>',
+      '<span class="blind-summary-line blind-summary-text">' + esc(snippet(m.audio && m.audio.aiText)) + '</span>'
+    ];
+    if (!isRealAudio(m)) {
+      parts.push('<span class="blind-badge">' + esc(CONFIG.demoBadge) + '</span>');
+    }
+    sum.innerHTML = parts.join('');
+
+    // ②③④⑤ 听原声 / 标记不准 / 标记准确 / 跳过
+    const actions = document.createElement('div');
+    actions.className = 'blind-actions';
+
+    const bListen = mkBtn('listen', CONFIG.btnListen, place, 'blind-listen');
+    bListen.dataset.id = String(m.id);
+    bListen.dataset.place = place;
+
+    const bInacc = mkBtn('inaccurate', CONFIG.btnInaccurate, place, '');
+    const bAcc = mkBtn('accurate', CONFIG.btnAccurate, place, 'blind-accurate');
+    const bSkip = mkBtn('skip', CONFIG.btnSkip, place, '');
+
+    actions.appendChild(bListen);
+    actions.appendChild(bInacc);
+    actions.appendChild(bAcc);
+    actions.appendChild(bSkip);
+
+    li.appendChild(h);
+    li.appendChild(sum);
+    li.appendChild(actions);
+    return li;
+  }
+
+  function render(progressDelay) {
+    const list = $('blind-list');
+    const empty = $('blind-list-empty');
+    if (!list || !empty) return;
+
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    const total = S.items.length;
+    if (!total) {
+      empty.hidden = false;
+      empty.textContent = CONFIG.emptyList;
+      setProgressText(CONFIG.progressEmpty, progressDelay);
+      return;
+    }
+
+    empty.hidden = true;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < total; i++) {
+      frag.appendChild(buildItem(S.items[i], i, total));
+    }
+    list.appendChild(frag);
+    S.currentIndex = 0;
+    // 重渲染后恢复「等待中 / 播放中」的按钮状态；
+    // 如果那条路标已经不在列表里（例如换了查询条件），就把等待/播放停掉
+    const keepPlaying = hasItem(S.playingId);
+    const keepPending = hasItem(S.pendingId);
+    if (!keepPending) cancelPending(false);
+    if (!keepPlaying) stopPlayback(false);
+    applyPlayState();
+    setProgressText(fill(CONFIG.progressText, { x: 1, y: total }), progressDelay);
+  }
+
+  function hasItem(id) {
+    if (!id) return false;
+    for (let i = 0; i < S.items.length; i++) {
+      if (S.items[i] && S.items[i].mark && S.items[i].mark.id === id) return true;
+    }
+    return false;
+  }
+
+  function focusSummary(index) {
+    const btns = document.querySelectorAll('#blind-list .blind-summary');
+    if (!btns.length) return false;
+    let i = index;
+    if (!isFinite(i) || i < 0 || i >= btns.length) i = 0;
+    const el = btns[i];
+    if (!el || typeof el.focus !== 'function') return false;
+    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+    return true;
+  }
+
+  /* ---------- 定位 ---------- */
+  function requestLocation() {
+    const geo = window.navigator ? window.navigator.geolocation : null;
+    if (!geo || typeof geo.getCurrentPosition !== 'function') {
+      onLocateFail();
+      return;
+    }
+    let settled = false;
+    try {
+      geo.getCurrentPosition(
+        function (pos) { settled = true; onLocateOk(pos); },
+        function () { settled = true; onLocateFail(); },
+        { enableHighAccuracy: false, timeout: 7000, maximumAge: 60000 }
+      );
+    } catch (e) {
+      onLocateFail();
+      return;
+    }
+    // 兜底：个别浏览器被拒绝后不回调，避免流程卡死
+    S.timers.push(setTimeout(function () {
+      if (!settled && !S.geoDone && !S.destroyed) onLocateFail();
+    }, 9000));
+  }
+
+  function onLocateOk(pos) {
+    if (S.geoDone || S.destroyed) return;
+    const lat = pos && pos.coords ? Number(pos.coords.latitude) : NaN;
+    const lng = pos && pos.coords ? Number(pos.coords.longitude) : NaN;
+    if (!isFinite(lat) || !isFinite(lng)) { onLocateFail(); return; }
+
+    S.geoDone = true;
+    S.pos = { lat: lat, lng: lng };
+    S.mode = 'located';
+    hideVoiceSearch();
+    setLocateText(CONFIG.locatedHint);
+
+    buildList();
+    const nearest = S.items.length ? (S.items[0].mark.place || CONFIG.noPlace) : CONFIG.coordPlace;
+    announce(fill(CONFIG.locatedNear, { place: nearest, n: S.items.length }));
+    render(3000);
+  }
+
+  function onLocateFail() {
+    if (S.geoDone || S.destroyed) return;
+    S.geoDone = true;
+    S.pos = null;
+    S.mode = 'voice';
+    showVoiceSearch();
+    setLocateText(CONFIG.locateFail);
+    buildList();
+    announce(CONFIG.locateFail);
+    render(3000);
+  }
+
+  /* ---------- 播放（种子条目走「演示占位」唯一例外） ---------- */
+  function ensureAudioEl() {
+    let el = $('blind-audio');
+    if (el) return el;
+    el = document.createElement('audio');
+    el.id = 'blind-audio';
+    el.className = 'blind-audio';
+    el.preload = 'none';
+    el.setAttribute('aria-hidden', 'true');
+    const root = $('view-blind') || document.body;
+    root.appendChild(el);
+    return el;
+  }
+
+  /* 按钮三态：听原声 / 取消等待 / 停止播放 */
+  function setPlayButtons(id, mode) {
+    const list = $('blind-list');
+    if (!list) return;
+    const btns = list.querySelectorAll('.blind-listen');
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      const mine = !!id && b.dataset.id === String(id);
+      let label = CONFIG.btnListen;
+      if (mine) label = (mode === 'wait') ? CONFIG.btnCancelWait : CONFIG.btnStop;
+      const place = b.dataset.place || '';
+      b.textContent = label;
+      b.setAttribute('aria-label', label + (place ? '：' + place : ''));
+    }
+  }
+
+  /* 按当前状态刷新所有播放按钮（重渲染后也要恢复） */
+  function applyPlayState() {
+    if (S.pendingId) setPlayButtons(S.pendingId, 'wait');
+    else if (S.playingId) setPlayButtons(S.playingId, 'play');
+    else setPlayButtons(null);
+  }
+
+  /* ---------- 演示数据的播放方式（合成语音 / 只用读屏念） ---------- */
+  function loadSpeakMode() {
+    let mode = '';
+    try {
+      const raw = localStorage.getItem('app_bamboo_settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && (s.demoSpeak === 'tts' || s.demoSpeak === 'reader')) mode = s.demoSpeak;
+      }
+    } catch (e) { /* 忽略 */ }
+    if (!mode) mode = (String(CONFIG.demoSpeakMode) === 'reader') ? 'reader' : 'tts';
+    return mode;
+  }
+
+  function saveSpeakMode(mode) {
+    try {
+      let s = null;
+      try { s = JSON.parse(localStorage.getItem('app_bamboo_settings') || '{}'); } catch (e) { s = null; }
+      if (!s || typeof s !== 'object' || Array.isArray(s)) s = {};   // 四端共用一个设置对象，别写坏
+      s.demoSpeak = mode;
+      localStorage.setItem('app_bamboo_settings', JSON.stringify(s));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  function renderSpeakMode() {
+    const btn = $('blind-speak-mode');
+    if (!btn) return;
+    const label = (S.demoSpeak === 'reader') ? CONFIG.btnSpeakReader : CONFIG.btnSpeakTts;
+    btn.textContent = label;
+    btn.setAttribute('aria-label', label);
+  }
+
+  function onToggleSpeakMode() {
+    S.demoSpeak = (S.demoSpeak === 'reader') ? 'tts' : 'reader';
+    saveSpeakMode(S.demoSpeak);
+    renderSpeakMode();
+    announce(S.demoSpeak === 'reader' ? CONFIG.speakModeReader : CONFIG.speakModeTts);
+  }
+
+  function bumpListens(id) {
+    try {
+      const all = BambooDB.load() || [];
+      let m = null;
+      for (let i = 0; i < all.length; i++) { if (all[i] && all[i].id === id) { m = all[i]; break; } }
+      if (!m || m.state !== 'published') return;
+      const u = m.usage || { listens: 0, confirm: 0, inaccurate: 0 };
+      BambooDB.updateMark(id, {
+        usage: {
+          listens: (u.listens || 0) + 1,
+          confirm: u.confirm || 0,
+          inaccurate: u.inaccurate || 0
+        }
+      });
+    } catch (e) { /* 计数失败不影响收听 */ }
+  }
+
+  function stopPlayback(announceEnd) {
+    const had = !!S.playingId;
+    S.playToken++;
+    S.playingId = null;
+    S.ttsOn = false;
+
+    const synth = window.speechSynthesis;
+    if (synth && typeof synth.cancel === 'function') {
+      try { synth.cancel(); } catch (e) { /* 忽略 */ }
+    }
+    if (S.audioEl) {
+      try {
+        S.audioEl.onended = null;
+        S.audioEl.onerror = null;
+        S.audioEl.pause();
+      } catch (e) { /* 忽略 */ }
+      try {
+        S.audioEl.removeAttribute('src');
+        S.audioEl.load();
+      } catch (e) { /* 忽略 */ }
+    }
+    if (S.audioUrl) {
+      try { URL.revokeObjectURL(S.audioUrl); } catch (e) { /* 忽略 */ }
+      S.audioUrl = null;
+    }
+    applyPlayState();
+    releaseLive();
+    if (had && announceEnd) announce(CONFIG.playEnd);
+    return had;
+  }
+
+  function finishPlayback() {
+    S.playToken++;
+    S.playingId = null;
+    S.ttsOn = false;
+    if (S.audioEl) {
+      try {
+        S.audioEl.onended = null;
+        S.audioEl.onerror = null;
+        S.audioEl.removeAttribute('src');
+        S.audioEl.load();
+      } catch (e) { /* 忽略 */ }
+    }
+    if (S.audioUrl) {
+      try { URL.revokeObjectURL(S.audioUrl); } catch (e) { /* 忽略 */ }
+      S.audioUrl = null;
+    }
+    applyPlayState();
+    releaseLive();
+    announce(CONFIG.playEnd);
+  }
+
+  function speakText(m, token) {
+    const text = m && m.audio ? String(m.audio.aiText || '') : '';
+    if (!text) { stopPlayback(false); announce(CONFIG.textMissing); return; }
+
+    const synth = window.speechSynthesis;
+    const U = window.SpeechSynthesisUtterance;
+    if (!synth || typeof U !== 'function' || typeof synth.speak !== 'function') {
+      stopPlayback(false);
+      announce(CONFIG.ttsUnavailable);
+      return;
+    }
+    let u = null;
+    try {
+      u = new U(text);
+      u.lang = 'zh-CN';
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
+    } catch (e) {
+      stopPlayback(false);
+      announce(CONFIG.ttsUnavailable);
+      return;
+    }
+    u.onend = function () {
+      if (token === S.playToken && S.playingId === m.id) finishPlayback();
+    };
+    u.onerror = function () {
+      if (token === S.playToken) stopPlayback(false);
+    };
+    S.ttsOn = true;
+    try {
+      synth.cancel();
+      synth.speak(u);
+    } catch (e) {
+      stopPlayback(false);
+      announce(CONFIG.ttsUnavailable);
+    }
+  }
+
+  /* 取消「等待播放」的倒计时 */
+  function cancelPending(announceIt) {
+    const had = !!S.pendingId;
+    if (S.pendingTimer) { clearTimeout(S.pendingTimer); S.pendingTimer = null; }
+    S.pendingId = null;
+    S.pendingItem = null;
+    applyPlayState();
+    if (had && announceIt) announce(CONFIG.waitCanceled);
+  }
+
+  /* 「听志愿者原声」：不再死等固定秒数，而是等读屏把这一轮提示念完、再安静一会儿才出声。
+     等待期间同一个按钮变成「取消等待」，播放中变成「停止播放」。 */
+  function toggleListen(item, btn) {
+    const m = item.mark;
+    if (!m) return;
+    if (S.pendingId === m.id) { cancelPending(true); return; }   // 再按一次 = 取消等待
+    if (S.playingId === m.id) { stopPlayback(true); return; }     // 再按一次 = 停止播放
+
+    stopPlayback(false);
+    cancelPending(false);
+
+    // 演示数据 + 「读屏念」模式：只让系统读屏念，全程只有一条声音通道，不可能叠音
+    if (!isRealAudio(m) && S.demoSpeak === 'reader') {
+      bumpListens(m.id);
+      announce(CONFIG.demoReading);
+      const text = m.audio ? String(m.audio.aiText || '') : '';
+      if (!text) { announce(CONFIG.textMissing); return; }
+      announce(text);
+      return;
+    }
+
+    // 合成语音 / 真实录音：先播报，再等读屏说完 + 安静下来，然后才开始出声
+    scheduleStart(item, isRealAudio(m) ? 'audio' : 'tts');
+  }
+
+  /* 排一次「让出声道」的等待：至少 playDelaySec 秒，并且要等这批播报念完 + 安静 playQuietMs */
+  function scheduleStart(item, mode) {
+    const m = item && item.mark;
+    if (!m) return;
+    S.pendingId = m.id;
+    S.pendingItem = item;
+    S.pendingMode = mode;
+    S.pendingStartAt = Date.now();
+    applyPlayState();
+    if (mode === 'tts') announce(CONFIG.demoPlaying);   // 提示放在「等待前」，开声那一刻不再播报
+    const quietSec = Math.round(Math.max(0, Number(CONFIG.playQuietMs) || 0) / 1000);
+    announce(fill(CONFIG.playWaiting, { n: quietSec }));
+    if (S.pendingTimer) { clearTimeout(S.pendingTimer); S.pendingTimer = null; }
+    S.pendingTimer = setTimeout(waitTick, 60);
+  }
+
+  function waitTick() {
+    S.pendingTimer = null;
+    if (S.destroyed || !S.pendingId) return;
+
+    const elapsed = Date.now() - S.pendingStartAt;
+    const floorMs = Math.max(0, Number(CONFIG.playDelaySec) || 0) * 1000;
+    const maxMs = Math.max(floorMs, (Number(CONFIG.playMaxWaitSec) || 0) * 1000);
+    const quietMs = Math.max(0, Number(CONFIG.playQuietMs) || 0);
+    const drained = !liveBusy && liveQueue.length === 0;          // 该念的都念完了
+    // 关键：从「读屏念完这一刻」起，再空 quietMs 才出声
+    const quiet = (Date.now() - (S.speechEndAt || 0)) >= quietMs;
+
+    if ((elapsed >= floorMs && drained && quiet) || elapsed >= maxMs) {
+      const it = S.pendingItem;
+      S.pendingId = null;
+      S.pendingItem = null;
+      S.pendingMode = '';
+      applyPlayState();
+      if (it) beginPlayback(it);
+      return;
+    }
+    S.pendingTimer = setTimeout(waitTick, 200);
+  }
+
+  function beginPlayback(item) {
+    const m = item && item.mark;
+    if (!m) return;
+
+    stopPlayback(false);
+    const token = S.playToken;
+    S.playingId = m.id;                 // 从这里开始，页面不再出声，把声道让给播放
+    applyPlayState();
+    bumpListens(m.id);
+
+    // 种子条目（mediaKey 为 null）：合成语音朗读 aiText。
+    // 「演示数据…」那条提示已经在等待前念完了，这里不再插播，避免和读屏撞在一起。
+    if (!isRealAudio(m)) {
+      speakText(m, token);
+      return;
+    }
+
+    // 有真实音频：indexedDB 取 blob 播放（真实录音本身就是内容，不再插播提示音）
+    (async function () {
+      let blob = null;
+      try { blob = await BambooDB.getMedia(m.audio.mediaKey); } catch (e) { blob = null; }
+      if (token !== S.playToken || S.destroyed) return;
+      if (!blob) {
+        announce(CONFIG.playMissing);
+        speakText(m, token);
+        return;
+      }
+      const el = S.audioEl;
+      if (!el) { stopPlayback(false); return; }
+      let url = '';
+      try { url = URL.createObjectURL(blob); } catch (e) { url = ''; }
+      if (!url) { stopPlayback(false); announce(CONFIG.playFail); return; }
+      if (S.audioUrl) {
+        try { URL.revokeObjectURL(S.audioUrl); } catch (e) { /* 忽略 */ }
+      }
+      S.audioUrl = url;
+      el.onended = function () { if (S.playingId === m.id) finishPlayback(); };
+      el.onerror = function () {
+        if (token !== S.playToken) return;
+        stopPlayback(false);
+        announce(CONFIG.playFail);
+      };
+      try {
+        el.src = url;
+      } catch (e) {
+        stopPlayback(false);
+        announce(CONFIG.playFail);
+        return;
+      }
+      const p = el.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch(function () {
+          if (token !== S.playToken) return;
+          stopPlayback(false);
+          announce(CONFIG.playFail);
+        });
+      }
+    })();
+  }
+
+  /* ---------- 三个操作 ---------- */
+  function onSelect(item, index) {
+    if (!item) return;
+    S.currentIndex = index;
+    setProgressText(fill(CONFIG.progressText, { x: index + 1, y: S.items.length }), 0);
+    const li = document.querySelector('#blind-list .blind-item[data-index="' + index + '"]');
+    const b = li ? li.querySelector('.blind-listen') : null;
+    if (b && typeof b.focus === 'function') {
+      try { b.focus({ preventScroll: true }); } catch (e) { b.focus(); }
+    }
+    announce(fill(CONFIG.summarySelect, { place: item.mark.place || CONFIG.noPlace }));
+  }
+
+  function onSkip(index) {
+    const total = S.items.length;
+    if (!total) return;
+    // 跳过这条时，如果它正在「等待播放」，就别让它下一句突然响起来
+    const cur = S.items[index];
+    if (cur && S.pendingId === cur.mark.id) cancelPending(false);
+    if (total <= 1) {
+      announce(CONFIG.skipOnly);
+      focusSummary(0);
+      return;
+    }
+    const next = (index + 1) % total;
+    S.currentIndex = next;
+    setProgressText(fill(CONFIG.progressText, { x: next + 1, y: total }), 0);
+    focusSummary(next);
+    announce(next === 0 ? CONFIG.skipWrap : CONFIG.skipDone);
+  }
+
+  function onInaccurate(item, index) {
+    if (!item) return;
+    const id = item.mark.id;
+    if (S.playingId === id) stopPlayback(false);
+    if (S.pendingId === id) cancelPending(false);
+    announce(CONFIG.feedbackDone);
+
+    (async function () {
+      try { await BambooDB.markInaccurate(id); } catch (e) { /* 忽略 */ }
+      if (S.destroyed) return;
+
+      buildList();
+      render(2000);
+
+      if (!S.items.length) {
+        const empty = $('blind-list-empty');
+        if (empty && typeof empty.focus === 'function') {
+          try { empty.focus({ preventScroll: true }); } catch (e) { empty.focus(); }
+        }
+        return;
+      }
+      const target = Math.min(index, S.items.length - 1);
+      S.currentIndex = target;
+      setProgressText(fill(CONFIG.progressText, { x: target + 1, y: S.items.length }), 2000);
+      focusSummary(target);
+    })();
+  }
+
+  /* 标记准确：和「标记不准」同样的操作方式（按一下就生效、立刻播报），
+     但结果不同 —— 只把 usage.confirm 加一，路标继续留在列表里（状态仍 published）。 */
+  function onAccurate(item, index) {
+    if (!item) return;
+    const id = item.mark.id;
+    let m = null;
+    try {
+      const all = BambooDB.load() || [];
+      for (let i = 0; i < all.length; i++) { if (all[i] && all[i].id === id) { m = all[i]; break; } }
+    } catch (e) { m = null; }
+
+    if (m && m.usage) {
+      try {
+        BambooDB.updateMark(id, {
+          usage: {
+            listens: m.usage.listens || 0,
+            confirm: (m.usage.confirm || 0) + 1,
+            inaccurate: m.usage.inaccurate || 0
+          }
+        });
+      } catch (e) { /* 计数失败不影响播报 */ }
+    }
+    announce(fill(CONFIG.accurateDone, { place: item.mark.place || CONFIG.noPlace }));
+  }
+
+  /* ---------- 事件 ---------- */
+  function onListClick(e) {
+    const target = e.target;
+    if (!target || typeof target.closest !== 'function') return;
+    const btn = target.closest('button');
+    const list = $('blind-list');
+    if (!btn || !list || !list.contains(btn)) return;
+    const li = btn.closest('.blind-item');
+    if (!li) return;
+    const index = Number(li.dataset.index);
+    const item = S.items[index];
+    if (!item) return;
+
+    const act = btn.dataset.act;
+    if (act === 'summary') onSelect(item, index);
+    else if (act === 'listen') toggleListen(item, btn);
+    else if (act === 'inaccurate') onInaccurate(item, index);
+    else if (act === 'accurate') onAccurate(item, index);
+    else if (act === 'skip') onSkip(index);
+  }
+
+  function onListFocusIn(e) {
+    const target = e.target;
+    if (!target || typeof target.closest !== 'function') return;
+    const li = target.closest('.blind-item');
+    if (!li) return;
+    const i = Number(li.dataset.index);
+    if (isFinite(i)) S.currentIndex = i;
+  }
+
+  /* 读屏每移动一次焦点都会念一段：把「预计念完的时刻」往后推，免得我们抢话 */
+  function onAnyFocusIn() {
+    const t = Date.now() + 2000;
+    if (t > (S.speechEndAt || 0)) S.speechEndAt = t;
+  }
+
+  /* ---------- 身份切换菜单（默认收起，只留一个「切换身份」按钮） ---------- */
+  function isRolesOpen() {
+    const panel = $('blind-roles-list');
+    return !!(panel && !panel.hidden);
+  }
+
+  function setRolesOpen(open, focusBtn) {
+    const btn = $('blind-roles-btn');
+    const panel = $('blind-roles-list');
+    if (!btn || !panel) return;
+    const willOpen = !!open;
+    if (panel.hidden !== !willOpen) panel.hidden = !willOpen;
+    btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    if (willOpen) {
+      // 展开后直接把焦点放到第一个身份上，读屏立刻念出来，不用再摸
+      const first = panel.querySelector('a');
+      if (first && typeof first.focus === 'function') {
+        try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }
+      }
+    } else if (focusBtn && typeof btn.focus === 'function') {
+      try { btn.focus({ preventScroll: true }); } catch (e) { btn.focus(); }
+    }
+  }
+
+  function onRolesClick() {
+    setRolesOpen(!isRolesOpen(), false);
+  }
+
+  function onRolesKey(e) {
+    if (!e) return;
+    const k = e.key || e.keyCode;
+    if ((k === 'Escape' || k === 'Esc' || k === 27) && isRolesOpen()) {
+      setRolesOpen(false, true);
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+    }
+  }
+
+  /* 焦点离开整个菜单就自动收起（不抢焦点） */
+  function onRolesFocusOut() {
+    if (!isRolesOpen()) return;
+    setTimeout(function () {
+      if (S.destroyed || !isRolesOpen()) return;
+      const nav = $('blind-roles');
+      const active = document.activeElement;
+      if (nav && active && nav.contains(active)) return;
+      setRolesOpen(false, false);
+    }, 0);
+  }
+
+  function bindEvents() {
+    const list = $('blind-list');
+    const form = $('blind-dictation-form');
+    const voiceBtn = $('blind-voice-btn');
+    const allBtn = $('blind-voice-all');
+    const dictInput = $('blind-dictation-input');
+    const speakBtn = $('blind-speak-mode');
+    const root = $('view-blind');
+    const rolesBtn = $('blind-roles-btn');
+    const rolesNav = $('blind-roles');
+    const h = {
+      listClick: function (e) { onListClick(e); },
+      listFocusIn: function (e) { onListFocusIn(e); },
+      rootFocusIn: function () { onAnyFocusIn(); },
+      formSubmit: function (e) { onQuery(e); },
+      voiceClick: function () { startVoiceInput(); },
+      allClick: function () { showAllMarks(); },
+      dictInput: function () { onDictationInput(); },
+      speakClick: function () { onToggleSpeakMode(); },
+      rolesClick: function () { onRolesClick(); },
+      rolesKey: function (e) { onRolesKey(e); },
+      rolesFocusOut: function () { onRolesFocusOut(); }
+    };
+    if (list) {
+      list.addEventListener('click', h.listClick);
+      list.addEventListener('focusin', h.listFocusIn);
+    }
+    if (root) root.addEventListener('focusin', h.rootFocusIn);
+    if (form) form.addEventListener('submit', h.formSubmit);
+    if (voiceBtn) voiceBtn.addEventListener('click', h.voiceClick);
+    if (allBtn) allBtn.addEventListener('click', h.allClick);
+    if (dictInput) dictInput.addEventListener('input', h.dictInput);
+    if (speakBtn) speakBtn.addEventListener('click', h.speakClick);
+    if (rolesBtn) rolesBtn.addEventListener('click', h.rolesClick);
+    if (rolesNav) {
+      rolesNav.addEventListener('keydown', h.rolesKey);
+      rolesNav.addEventListener('focusout', h.rolesFocusOut);
+    }
+    S.handlers = h;
+  }
+
+  function unbindEvents() {
+    const h = S.handlers;
+    if (!h) return;
+    const list = $('blind-list');
+    const form = $('blind-dictation-form');
+    const voiceBtn = $('blind-voice-btn');
+    const allBtn = $('blind-voice-all');
+    const dictInput = $('blind-dictation-input');
+    const speakBtn = $('blind-speak-mode');
+    const root = $('view-blind');
+    const rolesBtn = $('blind-roles-btn');
+    const rolesNav = $('blind-roles');
+    if (list) {
+      list.removeEventListener('click', h.listClick);
+      list.removeEventListener('focusin', h.listFocusIn);
+    }
+    if (root) root.removeEventListener('focusin', h.rootFocusIn);
+    if (form) form.removeEventListener('submit', h.formSubmit);
+    if (voiceBtn) voiceBtn.removeEventListener('click', h.voiceClick);
+    if (allBtn) allBtn.removeEventListener('click', h.allClick);
+    if (dictInput) dictInput.removeEventListener('input', h.dictInput);
+    if (speakBtn) speakBtn.removeEventListener('click', h.speakClick);
+    if (rolesBtn) rolesBtn.removeEventListener('click', h.rolesClick);
+    if (rolesNav) {
+      rolesNav.removeEventListener('keydown', h.rolesKey);
+      rolesNav.removeEventListener('focusout', h.rolesFocusOut);
+    }
+    S.handlers = null;
+  }
+
+  /* ---------- 生命周期 ---------- */
+  function init() {
+    if (S.inited) return;
+    S.inited = true;
+    S.destroyed = false;
+    S.geoDone = false;
+    S.pos = null;
+    S.keyword = '';
+    S.items = [];
+    S.mode = 'locating';
+    S.pendingId = null;
+    S.pendingItem = null;
+    S.speechEndAt = 0;
+    S.recognizing = false;
+    S.recognition = null;
+    liveQueue.length = 0;
+    liveBusy = false;
+
+    document.title = CONFIG.appTitle;
+
+    // 数据层：把配置区的 apiBase 写进公共数据层
+    try { BambooDB.API.setBase(CONFIG.apiBase); } catch (e) { /* 忽略 */ }
+    if (String(CONFIG.apiBase).toLowerCase() !== 'local') {
+      // TODO（服务器模式）：把 load/persist/listMarks/saveMark/updateMark/markInaccurate
+      // 换成 fetch(CONFIG.apiBase + '/api/marks' ...)，本端 UI 与文案不用改。
+    }
+
+    S.audioEl = ensureAudioEl();
+    bindEvents();
+    setRolesOpen(false, false);      // 身份切换默认收起，只留一个按钮
+    setVoiceBtn(false);
+    hideVoiceSearch();
+
+    // 演示数据的播放方式：沿用上次的选择，默认合成语音
+    S.demoSpeak = loadSpeakMode();
+    S.heldProgress = null;
+    renderSpeakMode();
+
+    setLocateText('正在获取您的位置，请稍候。');
+    setProgressText(CONFIG.progressLocating, 0);
+
+    // 定位成功/失败后再渲染列表（避免列表先渲染再重排，导致读屏焦点丢失）
+    requestLocation();
+  }
+
+  function destroy() {
+    S.destroyed = true;
+
+    stopVoiceInput(true);
+    stopPlayback(false);
+
+    const synth = window.speechSynthesis;
+    if (synth && typeof synth.cancel === 'function') {
+      try { synth.cancel(); } catch (e) { /* 忽略 */ }
+    }
+    if (S.audioEl) {
+      try {
+        S.audioEl.onended = null;
+        S.audioEl.onerror = null;
+        S.audioEl.pause();
+        S.audioEl.removeAttribute('src');
+        S.audioEl.load();
+      } catch (e) { /* 忽略 */ }
+    }
+    if (S.audioUrl) {
+      try { URL.revokeObjectURL(S.audioUrl); } catch (e) { /* 忽略 */ }
+      S.audioUrl = null;
+    }
+
+    for (let i = 0; i < S.timers.length; i++) clearTimeout(S.timers[i]);
+    S.timers = [];
+    if (S.liveTimer) { clearTimeout(S.liveTimer); S.liveTimer = null; }
+    if (S.progressTimer) { clearTimeout(S.progressTimer); S.progressTimer = null; }
+    if (S.pendingTimer) { clearTimeout(S.pendingTimer); S.pendingTimer = null; }
+    if (S.inputTimer) { clearTimeout(S.inputTimer); S.inputTimer = null; }
+    S.heldProgress = null;
+    liveQueue.length = 0;
+    liveBusy = false;
+
+    unbindEvents();
+
+    const list = $('blind-list');
+    if (list) { while (list.firstChild) list.removeChild(list.firstChild); }
+    const live = $('blind-live');
+    if (live) live.textContent = '';
+
+    S.items = [];
+    S.playingId = null;
+    S.pendingId = null;
+    S.pendingItem = null;
+    S.ttsOn = false;
+    S.progressTimer = null;
+    S.inited = false;
+  }
+
+  /* ---------- 对外只暴露这两个方法（公共契约 4.6） ---------- */
+  window.BambooBlind = {
+    init: function () { init(); },
+    destroy: function () { destroy(); }
+  };
+
+  // 页面加载即启动（脚本位于 body 末尾，DOM 已就绪）
+  init();
+})();
+</script>
+
+<!--
+════════════════════════════════════════════════════════════════════
+【修改说明】
+1) 改文字（最常用）
+   打开本文件，找到脚本最上面的「文字配置区」CONFIG，
+   所有读屏念出来的话都在里面。花括号里的 {place} {dist} {x} {y} {n}
+   是自动填的占位符，不要删，只改花括号外面的字即可。
+2) 调字号
+   改 :root 里的 --bl-fs-body（正文，默认 20px）、--bl-fs-title（标题 30px）、
+   --bl-btn-h（按钮高度 56px）。正文请保持 ≥20px。
+3) 换配色
+   改 :root 里的 --bl-bg（底色）--bl-fg（字色）--bl-card（卡片色）
+   --bl-line（边框色）--bl-focus（焦点轮廓色）。竹语端默认黑底黄字，保持高对比。
+4) 插图位置
+   图片只在 <main> 中间放了注释模板：
+   <img src="你的图片.jpg" alt="图片说明" style="width:100%">
+   去掉注释即可。本端是读屏收听的界面，不放装饰图，alt 必须写清楚。
+5) 接后端
+   ① 把配置区 apiBase:'local' 改成你的服务器地址；
+   ② 在 init() 里标了 TODO 的地方把 BambooDB 的本地读写换成 fetch，
+      接口照公共契约的字段走，本端界面不用改。
+   ③ 后端语言不限定（Node.js / Python / PHP 都能接）。
+6) 定位与语音找地点（本端不提供打字输入）
+   浏览器只在 HTTPS 或 localhost 下给定位权限。双击用 file:// 打开时
+   通常会被拒绝，页面会改成「语音找地点」，提示「定位未开启，您可以语音说出地点」：
+   按「说出地名」按钮，用手机系统的语音识别说出地名（例如「人民广场」），
+   说完会自动过滤列表，不需要再按任何按钮；再说一次可以换个地方。
+   如果这台手机的浏览器没有网页语音识别（例如 iPhone 的 Safari），
+   会提示用输入法上的「麦克风键」说话（系统听写），同样不需要键盘打字，
+   说完 1.5 秒会自动搜索。
+7) 合并四端时不要改的东西
+   根容器 id（view-blind）、blind- 开头的类名、BambooDB 数据层、
+   种子数据、localStorage 键名（app_bamboo_marks 等）。
+8) 数据与播放（重要：别和读屏抢着说话）
+   数据全部存在本机浏览器（localStorage + IndexedDB）。
+   ① 只有一个声音：页面所有播报都走同一条 aria-live，由系统读屏念；
+      播放期间页面停止播报（播报先压住，播完再念），不会和音频叠在一起。
+   ② 开声前让位（规则：读屏念完 → 再空 5 秒 → 才播）：
+      点「听志愿者原声」不会立刻出声，而是等这一轮提示念完（起底 CONFIG.playDelaySec 秒，默认 8），
+      从「念完那一刻」再空 CONFIG.playQuietMs 毫秒（默认 5000）才开口，最长等 playMaxWaitSec 秒（默认 25）。
+      等待期间焦点一动（读屏又会念一段）就把计时往后推；按钮变成「取消等待」，再按一次就取消。
+   ③ 演示数据两种放法（种子条目 mediaKey 为 null，卡片标「演示数据 · 原声占位」）：
+      · 默认「合成语音」：用 speechSynthesis 念 aiText，按 ② 让位后开声；
+      · 备选「读屏念全文」：点一下就让读屏念，全程只有一条声音通道，
+        在手机上绝不会和读屏叠在一起 —— 页面下方「播放方式」按钮一键切换，选择会记住。
+   ④ 真实录音（mediaKey 有值）：同样按 ② 让位后播放，播放期间页面不播报。
+9) 每条路标的四个操作（顺序就是读屏朗读顺序）
+   「听志愿者原声」→ 播放 / 朗读这条的原文（按上面第 8 条 ② 让位再出声）；
+   「标记不准」→ usage.inaccurate 加一，该条回到待审队列（会从列表里移出，优先复核）；
+   「标记准确」→ usage.confirm 加一，路标继续留在列表里（正向确认）；
+   「跳过这条」→ 焦点自动移到下一条。
+10) 顶栏「切换身份」按钮（默认收起）
+    四个身份的链接集中在 <nav id="blind-roles"> 里，平时只显示一个「切换身份」按钮；
+    按一下展开（焦点自动落到第一个身份，读屏立刻念出来），再按一下收起；
+    按 Esc 也会收起并把焦点放回按钮；焦点移出菜单后会自动收起。
+    改名字只改那四个 <a> 的文字，加身份就照同样的 <li><a class="blind-role-link"> 再加一条。
+════════════════════════════════════════════════════════════════════
+-->
+</body>
+</html>
