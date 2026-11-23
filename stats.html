@@ -20,22 +20,13 @@
       <h1>帮步使用数据</h1>
       <p>查看网站访问、志愿者参与和路标审核进度。</p>
     </header>
-    <section id="page-account" class="panel account" aria-label="管理员账号">
-      <form hidden>
-        <h2>管理员登录</h2>
-        <p>使用有审核权限的帮步账号查看数据。</p>
-        <p>首次使用请先用已获授权的邮箱<a href="preview/volunteer.html">注册并验证邮箱</a>。</p>
-        <label>邮箱 <input name="email" type="email" autocomplete="username" required></label>
-        <label>密码 <input name="password" type="password" autocomplete="current-password" minlength="6" required></label>
-        <button type="submit" value="login">登录</button>
-      </form>
-      <div class="account-controls page-account-controls" hidden>
+    <section class="panel controls" aria-label="数据筛选">
+      <div class="filters">
         <label for="period">统计范围</label>
         <select id="period"><option value="7">最近 7 天</option><option value="30">最近 30 天</option></select>
-        <button type="button" data-refresh>刷新数据</button>
-        <button type="button" class="quiet" data-sign-out>退出登录</button>
+        <button type="button" id="refresh-stats">刷新数据</button>
       </div>
-      <p class="notice" role="status">正在检查登录状态…</p>
+      <p class="notice" id="load-status" role="status">正在读取使用数据…</p>
     </section>
     <div id="metrics" hidden>
       <p class="coverage" id="coverage"></p>
@@ -86,7 +77,6 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
   <script src="cloud.js"></script>
-  <script src="preview/supabase-pages.js"></script>
   <script src="stats.js"></script>
 </body>
 </html>

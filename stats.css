@@ -22,15 +22,11 @@ h1 { margin: 0; font-size: clamp(1.9rem, 5vw, 3.1rem); line-height: 1.15; }
 .intro p { margin: .6rem 0 0; color: var(--muted); }
 h2 { margin: 0 0 .7rem; font-size: 1.18rem; }
 .panel { border: 1px solid var(--line); border-radius: 1rem; background: #fff; }
-.account { padding: 1rem; }
-.account form { max-width: 24rem; display: grid; gap: .65rem; }
-.account form p, .account form h2 { margin: 0; }
-.account input { width: 100%; display: block; margin-top: .25rem; }
-.account-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; }
-.account-controls label { font-weight: 650; }
-input, select, button { min-height: 44px; border: 1px solid #6f8a79; border-radius: .5rem; padding: .5rem .75rem; font: inherit; background: #fff; color: inherit; }
+.controls { padding: 1rem; }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; }
+.filters label { font-weight: 650; }
+select, button { min-height: 44px; border: 1px solid #6f8a79; border-radius: .5rem; padding: .5rem .75rem; font: inherit; background: #fff; color: inherit; }
 button { color: #fff; background: var(--green); border-color: var(--green); cursor: pointer; }
-button.quiet { color: var(--green); background: #fff; }
 button:disabled { opacity: .65; cursor: wait; }
 :focus-visible { outline: 3px solid #4a75cf; outline-offset: 3px; }
 .notice { margin: .5rem 0 0; }

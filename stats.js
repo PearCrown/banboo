@@ -7,15 +7,12 @@
   });
   const names = {home: '首页', volunteer: '志愿者采集', blind: '竹语 · 读屏', lowvis: '竹影 · 低视力', review: '管理员审核'};
   const metrics = byId('metrics');
-  const emptyMetrics = metrics.cloneNode(true);
-  let snapshot;
+  const period = byId('period');
+  const refresh = byId('refresh-stats');
+  const status = byId('load-status');
+  let displayedPeriod;
 
-  function clear() {
-    snapshot = undefined;
-    metrics.replaceChildren(...emptyMetrics.cloneNode(true).childNodes);
-  }
-
-  function render() {
+  function render(snapshot) {
     const {traffic, accounts, routes, daily, pages} = snapshot;
     const counts = {
       views: traffic.views, visitors: traffic.visitors, trial: traffic.trial_browsers,
@@ -73,27 +70,28 @@
     }));
   }
 
-  setupPageAccount({
-    role: 'review',
-    content: [metrics],
-    readLabel: '正在读取使用数据…',
-    readErrorLabel: '暂时无法读取使用数据，请重试。',
-    store: {
-      clear,
-      async refresh() {
-        const sessionId = cloudSession?.user.id;
-        const {data, error} = await bambooCloud.rpc('bamboo_usage_snapshot', {p_days: Number(byId('period').value)});
-        if (sessionId !== cloudSession?.user.id) return false;
-        if (error?.code === '42501') {
-          clear();
-          return false;
-        }
-        if (error) throw error;
-        snapshot = data;
-        return true;
-      }
-    },
-    render
-  });
-  byId('period').addEventListener('change', () => document.querySelector('[data-refresh]').click());
+  async function loadStats() {
+    if (refresh.disabled) return;
+    period.disabled = refresh.disabled = true;
+    status.textContent = '正在读取使用数据…';
+    try {
+      if (!bambooCloud) throw new Error('Cloud client unavailable');
+      const {data, error} = await bambooCloud.rpc('bamboo_usage_snapshot', {p_days: Number(period.value)});
+      if (error) throw error;
+      render(data);
+      displayedPeriod = period.value;
+      metrics.hidden = false;
+      status.textContent = '';
+    } catch (error) {
+      if (displayedPeriod) period.value = displayedPeriod;
+      status.textContent = displayedPeriod ? '刷新失败，当前显示上一次的数据。' : '暂时无法读取使用数据，请重试。';
+      console.warn('Could not load usage dashboard', error);
+    } finally {
+      period.disabled = refresh.disabled = false;
+    }
+  }
+
+  period.addEventListener('change', loadStats);
+  refresh.addEventListener('click', loadStats);
+  loadStats();
 })();
