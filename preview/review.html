@@ -516,7 +516,7 @@ img{max-width:100%;height:auto}
 </style>
 <link rel="stylesheet" href="./supabase-pages.css">
 </head>
-<body>
+<body data-usage-page="review">
 <div id="view-rev" class="view">
 
   <!-- 背景竹林：线稿，只做装饰（竹节几何 + 低透明度） -->
@@ -613,6 +613,7 @@ img{max-width:100%;height:auto}
     <section id="rev-page-queue" class="rev-page" aria-labelledby="rev-queue-title">
       <div class="rev-wrap">
         <h2 class="rev-page-title" id="rev-queue-title" tabindex="-1">待办队列</h2>
+        <p><a href="../stats.html">查看帮步使用数据</a></p>
 
         <!-- 区域 2 · 统计看板（手机横向滑动） -->
         <div class="rev-stats" role="list" aria-label="任务统计">
@@ -809,6 +810,7 @@ img{max-width:100%;height:auto}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 <script src="../cloud.js"></script>
+<script src="../usage-tracking.js"></script>
 <script src="./supabase-pages.js"></script>
 <script>
 (()=>{

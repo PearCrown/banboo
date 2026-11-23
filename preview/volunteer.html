@@ -551,7 +551,7 @@ html.bb-large .vol-toast{bottom:calc(102px + env(safe-area-inset-bottom,0px))}
 </style>
 <link rel="stylesheet" href="./supabase-pages.css">
 </head>
-<body>
+<body data-usage-page="volunteer">
 
 <!-- 页面唯一根容器：#view-vol（四端合并时逐字保留） -->
 <div id="view-vol" class="view">
@@ -631,6 +631,7 @@ html.bb-large .vol-toast{bottom:calc(102px + env(safe-area-inset-bottom,0px))}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 <script src="../cloud.js"></script>
+<script src="../usage-tracking.js"></script>
 <script src="./supabase-pages.js"></script>
 <script>
 (()=>{

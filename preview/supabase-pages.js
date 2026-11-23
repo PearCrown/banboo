@@ -82,7 +82,8 @@ function routePageStore(role){
   };
 }
 
-function setupPageAccount({role,store,content,render,onSessionEnd,beforeSignOut,canSignOut}){
+function setupPageAccount({role,store,content,render,onSessionEnd,beforeSignOut,canSignOut,
+  readLabel='正在读取云端路标…',readErrorLabel='暂时无法读取云端路标，请重试。'}){
   const panel = document.getElementById('page-account');
   const form = panel.querySelector('form');
   const controls = panel.querySelector('.page-account-controls');
@@ -93,7 +94,7 @@ function setupPageAccount({role,store,content,render,onSessionEnd,beforeSignOut,
   let busy = false;
   const setBusy = value => {
     busy = value;
-    panel.querySelectorAll('button').forEach(button => { button.disabled = value; });
+    panel.querySelectorAll('button, select').forEach(control => { control.disabled = value; });
   };
   const showContent = visible => {
     authorized = visible;
@@ -114,7 +115,7 @@ function setupPageAccount({role,store,content,render,onSessionEnd,beforeSignOut,
       status.textContent = bambooCloud ? '' : '登录服务暂时无法加载，请刷新页面后重试。';
       return;
     }
-    status.textContent = '正在读取云端路标…';
+    status.textContent = readLabel;
     try{
       const allowed = await store.refresh();
       if(attempt !== revision) return;
@@ -123,7 +124,7 @@ function setupPageAccount({role,store,content,render,onSessionEnd,beforeSignOut,
       if(allowed) render();
     }catch(error){
       if(attempt !== revision) return;
-      status.textContent = '暂时无法读取云端路标，请重试。';
+      status.textContent = readErrorLabel;
       console.warn('Could not refresh route page',error);
     }
   };

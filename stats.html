@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#153c2d">
+  <title>使用数据 · 帮步 Bamboo</title>
+  <link rel="stylesheet" href="stats.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="frame masthead-inner">
+      <a class="brand" href="./">帮步 <span>Bamboo</span></a>
+      <a class="back" href="preview/review.html">审核工作台</a>
+    </div>
+  </header>
+  <main class="frame">
+    <header class="intro">
+      <h1>帮步使用数据</h1>
+      <p>查看网站访问、志愿者参与和路标审核进度。</p>
+    </header>
+    <section id="page-account" class="panel account" aria-label="管理员账号">
+      <form hidden>
+        <h2>管理员登录</h2>
+        <p>使用有审核权限的帮步账号查看数据。</p>
+        <p>首次使用请先用已获授权的邮箱<a href="preview/volunteer.html">注册并验证邮箱</a>。</p>
+        <label>邮箱 <input name="email" type="email" autocomplete="username" required></label>
+        <label>密码 <input name="password" type="password" autocomplete="current-password" minlength="6" required></label>
+        <button type="submit" value="login">登录</button>
+      </form>
+      <div class="account-controls page-account-controls" hidden>
+        <label for="period">统计范围</label>
+        <select id="period"><option value="7">最近 7 天</option><option value="30">最近 30 天</option></select>
+        <button type="button" data-refresh>刷新数据</button>
+        <button type="button" class="quiet" data-sign-out>退出登录</button>
+      </div>
+      <p class="notice" role="status">正在检查登录状态…</p>
+    </section>
+    <div id="metrics" hidden>
+      <p class="coverage" id="coverage"></p>
+      <div class="metric-groups">
+        <section aria-labelledby="traffic-title">
+          <h2 id="traffic-title">访问与试用</h2>
+          <div class="metric-grid">
+            <article class="metric panel"><h3>页面浏览量</h3><p class="value" id="views">—</p><p>所选时段的页面浏览次数</p></article>
+            <article class="metric panel"><h3>独立访问浏览器</h3><p class="value" id="visitors">—</p><p>同一浏览器在时段内只计一次</p></article>
+            <article class="metric panel"><h3>试用浏览器</h3><p class="value" id="trial">—</p><p>打开过采集、竹语或竹影页面</p></article>
+            <article class="metric panel"><h3>已验证志愿者账号</h3><p class="value" id="verified">—</p><p id="new-verified"></p></article>
+          </div>
+        </section>
+        <section aria-labelledby="routes-title">
+          <h2 id="routes-title">投稿与审核</h2>
+          <div class="metric-grid">
+            <article class="metric panel"><h3>待审核路标</h3><p class="value" id="pending">—</p><p>当前待办</p></article>
+            <article class="metric panel"><h3>审核通过音频</h3><p class="value" id="approved-audio">—</p><p>累计已发布的路标原声</p></article>
+            <article class="metric panel"><h3>新增投稿</h3><p class="value" id="submissions">—</p><p id="submitters"></p></article>
+            <article class="metric panel"><h3>审核通过率</h3><p class="value" id="approval-rate">—</p><p id="review-count"></p></article>
+          </div>
+        </section>
+      </div>
+      <div class="details-grid">
+        <section class="panel detail" aria-labelledby="trend-title">
+          <h2 id="trend-title">每日趋势</h2>
+          <div class="plot-heading">
+            <p>页面浏览量</p>
+            <p class="muted" id="chart-peak"></p>
+          </div>
+          <div id="chart" class="chart" aria-hidden="true"></div>
+          <div class="chart-dates" aria-hidden="true"><span id="start-date"></span><span id="end-date"></span></div>
+          <details>
+            <summary>查看每日浏览量与新增投稿</summary>
+            <table><caption>按北京时间统计</caption><thead><tr><th scope="col">日期</th><th scope="col">浏览量</th><th scope="col">新增投稿</th></tr></thead><tbody id="daily"></tbody></table>
+          </details>
+        </section>
+        <section class="panel detail" aria-labelledby="pages-title">
+          <h2 id="pages-title">各页面浏览量</h2>
+          <ul class="pages" id="pages"></ul>
+        </section>
+      </div>
+      <footer class="notes">
+        <p>试用量按浏览器估算。换设备、换浏览器或清除站点数据可能重复计数。同一浏览器在 10 秒内重复打开同一页面只计一次。采集只使用站点随机标识，不记录姓名、邮箱或 IP 到统计表。</p>
+        <p id="updated"></p>
+      </footer>
+    </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+  <script src="cloud.js"></script>
+  <script src="preview/supabase-pages.js"></script>
+  <script src="stats.js"></script>
+</body>
+</html>
