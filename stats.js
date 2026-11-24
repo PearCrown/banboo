@@ -5,6 +5,7 @@
   const timestamp = new Intl.DateTimeFormat('zh-CN', {dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Shanghai'});
   const names = {home: '首页', volunteer: '志愿者采集', blind: '竹语 · 读屏', lowvis: '竹影 · 低视力', review: '管理员审核'};
   const labels = {views: '浏览量', submissions: '新增投稿'};
+  const pageColors = ['#b9ed9f', '#77bc9f', '#63989a', '#8b9bc4', '#a4a88a'];
   const metrics = byId('metrics');
   const period = byId('period');
   const seriesSwitch = byId('series');
@@ -21,6 +22,9 @@
   let request = 0;
   let activeIndex = -1;
   let chartMaximum = gridIntervals;
+  let touch;
+  let pointerFrame = 0;
+  let pointerX;
 
   function html(tag, text) {
     const element = document.createElement(tag);
@@ -65,23 +69,31 @@
     }));
 
     const ranking = Object.entries(names).map(([page, label]) => ({label, views: Number(pages[page])})).sort((a, b) => b.views - a.views);
-    byId('pages').replaceChildren(...ranking.map(({label, views}) => {
+    const total = Number(traffic.views);
+    byId('page-distribution').replaceChildren(...ranking.flatMap(({views}, index) => {
+      if (!views) return [];
+      const segment = html('i');
+      segment.style.flex = String(views);
+      segment.style.setProperty('--page-color', pageColors[index]);
+      return [segment];
+    }));
+    byId('pages').replaceChildren(...ranking.map(({label, views}, index) => {
       const li = html('li');
-      const track = html('div');
-      const fill = html('i');
-      const share = views / Math.max(1, Number(traffic.views));
+      const name = html('span', label);
+      const share = html('span', total ? percent.format(views / total) : '—');
       li.className = 'page-row';
-      track.className = 'page-track';
-      track.setAttribute('aria-hidden', 'true');
-      fill.style.setProperty('--share', share);
-      track.append(fill);
-      li.append(html('span', label), html('strong', formatValue(views, 'views')), track);
+      name.className = 'page-label';
+      share.className = 'page-share';
+      li.style.setProperty('--page-color', pageColors[index]);
+      li.append(name, html('strong', formatValue(views, 'views')), share);
       return li;
     }));
     renderChart();
   }
 
   function hideDay() {
+    if (pointerFrame) cancelAnimationFrame(pointerFrame);
+    pointerFrame = 0;
     activeIndex = -1;
     tooltip.hidden = cursor.hidden = true;
   }
@@ -111,6 +123,25 @@
     if (announce) byId('chart-status').textContent = row.day + '，' + labels[selectedSeries] + '，' + formatValue(value);
   }
 
+  // Use monotone tangents so rounded corners never overshoot the reported values.
+  function curve(points) {
+    const start = 'M' + points[0].join(',');
+    const slopes = points.slice(1).map(([, y], i) => y - points[i][1]);
+    const tangents = points.map((_, i) => {
+      if (i === 0) return slopes[0];
+      if (i === points.length - 1) return slopes.at(-1);
+      const before = slopes[i - 1];
+      const after = slopes[i];
+      return before * after <= 0 ? 0 : 2 * before * after / (before + after);
+    });
+    return start + points.slice(1).map(([x, y], i) => {
+      const [prevX, prevY] = points[i];
+      const dx = (x - prevX) / 3;
+      return ' C' + [prevX + dx, prevY + tangents[i] / 3, x - dx, y - tangents[i + 1] / 3, x, y]
+        .map(value => value.toFixed(2)).join(' ');
+    }).join('');
+  }
+
   function renderChart() {
     if (!snapshot) return;
     hideDay();
@@ -121,7 +152,7 @@
     const order = 10 ** Math.floor(Math.log10(target));
     const step = [1, 2, 3, 5, 10].find(value => value * order >= target) * order;
     chartMaximum = step * gridIntervals;
-    chart.style.setProperty('--chart-color', selectedSeries === 'views' ? '#138260' : '#566db6');
+    chart.style.setProperty('--chart-color', selectedSeries === 'views' ? '#b9ed9f' : '#9cbcfb');
     byId('chart-peak').textContent = '单日最高 ' + formatValue(peak);
     byId('axis-y').replaceChildren(...Array.from({length: gridIntervals + 1}, (_, i) => html('span', number.format((gridIntervals - i) * step))));
     byId('chart-grid').replaceChildren(...Array.from({length: gridIntervals + 1}, () => html('i')));
@@ -151,7 +182,7 @@
     });
     if (segment.length) segments.push(segment);
     const paths = segments.map(points => {
-      const line = 'M' + points.map(([x, y]) => x + ',' + y).join(' L');
+      const line = points.length === 1 ? 'M' + points[0].join(',') : curve(points);
       const [first, last] = [points[0], points.at(-1)];
       return {
         line: points.length === 1 ? line + 'h0.1' : line,
@@ -165,17 +196,41 @@
     requestAnimationFrame(() => requestAnimationFrame(() => plot.classList.add('plot-enter')));
   }
 
-  function pointFromPointer(event) {
+  function scrub(clientX) {
     if (!snapshot) return;
     const bounds = chart.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    if (!bounds.width) return;
+    const x = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width));
     showDay(Math.round(x * (snapshot.daily.length - 1)));
   }
 
-  chart.addEventListener('pointermove', event => {
-    if (event.pointerType !== 'touch') pointFromPointer(event);
+  chart.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch') touch = {id: event.pointerId, x: event.clientX, y: event.clientY};
   });
-  chart.addEventListener('click', pointFromPointer);
+  chart.addEventListener('pointermove', event => {
+    if (event.pointerType === 'touch') {
+      if (touch?.id !== event.pointerId) return;
+      if (!touch.scrubbing) {
+        const dx = Math.abs(event.clientX - touch.x);
+        const dy = Math.abs(event.clientY - touch.y);
+        if (dx < 6 || dy > dx) return;
+        touch.scrubbing = true;
+      }
+    }
+    pointerX = event.clientX;
+    if (!pointerFrame) {
+      pointerFrame = requestAnimationFrame(() => {
+        pointerFrame = 0;
+        scrub(pointerX);
+      });
+    }
+  });
+  chart.addEventListener('pointerup', () => { touch = undefined; });
+  chart.addEventListener('pointercancel', () => {
+    touch = undefined;
+    hideDay();
+  });
+  chart.addEventListener('click', event => { scrub(event.clientX); });
   chart.addEventListener('pointerleave', event => {
     if (event.pointerType !== 'touch' && !chart.matches(':focus-visible')) hideDay();
   });
