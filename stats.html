@@ -2,76 +2,104 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <meta name="theme-color" content="#153c2d">
+  <meta name="theme-color" content="#102d24">
   <title>使用数据 · 帮步 Bamboo</title>
   <link rel="stylesheet" href="stats.css">
 </head>
 <body>
+  <svg class="icon-bank" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.4 8a7.5 7.5 0 0 1 12.4-2.2L20 12M4 12l2.2 6.2A7.5 7.5 0 0 0 18.6 16"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 5v15h16M8 15l4-4 3 2 5-6"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5 20v-1.2A5.8 5.8 0 0 1 10.8 13h2.4a5.8 5.8 0 0 1 5.8 5.8V20"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8 12 2.5 2.5L16 9"/></symbol>
+    <symbol id="i-date" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M8 4v4m8-4v4M4 11h16"/></symbol>
+  </svg>
+  <a class="skip" href="#main">跳到数据总览</a>
   <header class="masthead">
     <div class="frame masthead-inner">
-      <a class="brand" href="./">帮步 <span>Bamboo</span></a>
-      <a class="back" href="preview/review.html">审核工作台</a>
+      <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>帮步 <small>Bamboo</small></span></a>
+      <span class="nav-label">使用数据</span>
+      <a class="review-link" href="preview/review.html">审核工作台 <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></a>
     </div>
   </header>
-  <main class="frame">
-    <header class="intro">
-      <h1>帮步使用数据</h1>
-      <p>查看网站访问、志愿者参与和路标审核进度。</p>
+  <main class="frame" id="main">
+    <header class="hero">
+      <div class="hero-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="hero-content">
+        <h1>帮步使用数据</h1>
+        <p>从访问、试用到路标发布，了解帮步的使用情况。</p>
+        <p class="hero-date"><svg class="icon" aria-hidden="true"><use href="#i-date"></use></svg><span id="coverage">统计时间采用北京时间</span></p>
+      </div>
     </header>
-    <section class="panel controls" aria-label="数据筛选">
-      <div class="filters">
-        <label for="period">统计范围</label>
-        <select id="period"><option value="7">最近 7 天</option><option value="30">最近 30 天</option></select>
-        <button type="button" id="refresh-stats">刷新数据</button>
+    <section class="section-bar" aria-label="数据筛选">
+      <div class="section-heading"><h2>核心指标</h2><span id="updated"></span></div>
+      <div class="toolbar">
+        <div class="segmented" id="period" role="group" aria-label="统计范围">
+          <button type="button" data-days="7" aria-pressed="true">最近 7 天</button>
+          <button type="button" data-days="30" aria-pressed="false">最近 30 天</button>
+        </div>
+        <button type="button" class="refresh" id="refresh-stats"><svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg><span>刷新</span></button>
       </div>
-      <p class="notice" id="load-status" role="status">正在读取使用数据…</p>
     </section>
-    <div id="metrics" hidden>
-      <p class="coverage" id="coverage"></p>
-      <div class="metric-groups">
-        <section aria-labelledby="traffic-title">
-          <h2 id="traffic-title">访问与试用</h2>
-          <div class="metric-grid">
-            <article class="metric panel"><h3>页面浏览量</h3><p class="value" id="views">—</p><p>所选时段的页面浏览次数</p></article>
-            <article class="metric panel"><h3>独立访问浏览器</h3><p class="value" id="visitors">—</p><p>同一浏览器在时段内只计一次</p></article>
-            <article class="metric panel"><h3>试用浏览器</h3><p class="value" id="trial">—</p><p>打开过采集、竹语或竹影页面</p></article>
-            <article class="metric panel"><h3>已验证志愿者账号</h3><p class="value" id="verified">—</p><p id="new-verified"></p></article>
-          </div>
-        </section>
-        <section aria-labelledby="routes-title">
-          <h2 id="routes-title">投稿与审核</h2>
-          <div class="metric-grid">
-            <article class="metric panel"><h3>待审核路标</h3><p class="value" id="pending">—</p><p>当前待办</p></article>
-            <article class="metric panel"><h3>审核通过音频</h3><p class="value" id="approved-audio">—</p><p>累计已发布的路标原声</p></article>
-            <article class="metric panel"><h3>新增投稿</h3><p class="value" id="submissions">—</p><p id="submitters"></p></article>
-            <article class="metric panel"><h3>审核通过率</h3><p class="value" id="approval-rate">—</p><p id="review-count"></p></article>
-          </div>
-        </section>
+    <p class="notice sr-only" id="load-status" role="status">正在读取使用数据…</p>
+    <div id="metrics" aria-busy="true">
+      <div class="metric-grid">
+        <article class="metric panel"><div class="metric-top"><h3>页面浏览量</h3><span class="metric-icon pine"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span></div><p class="value" id="views">—</p><p class="metric-hint">时段内的浏览次数</p></article>
+        <article class="metric panel"><div class="metric-top"><h3>独立访问浏览器</h3><span class="metric-icon teal"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg></span></div><p class="value" id="visitors">—</p><p class="metric-hint">按浏览器去重</p></article>
+        <article class="metric panel"><div class="metric-top"><h3>试用浏览器</h3><span class="metric-icon lime"><svg class="icon" aria-hidden="true"><use href="#i-compass"></use></svg></span></div><p class="value" id="trial">—</p><p class="metric-hint">打开过采集、竹语或竹影页面</p></article>
+        <article class="metric panel"><div class="metric-top"><h3>已验证志愿者账号</h3><span class="metric-icon mint"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></span></div><p class="value" id="verified">—</p><p class="metric-hint" id="new-verified">累计账号</p></article>
       </div>
-      <div class="details-grid">
-        <section class="panel detail" aria-labelledby="trend-title">
-          <h2 id="trend-title">每日趋势</h2>
-          <div class="plot-heading">
-            <p>页面浏览量</p>
-            <p class="muted" id="chart-peak"></p>
+      <div class="analysis-grid">
+        <section class="panel chart-panel" aria-labelledby="trend-title">
+          <header class="panel-head">
+            <div><h2 id="trend-title">每日趋势</h2><p id="chart-peak">按北京时间统计</p></div>
+            <div class="segmented chart-options" id="series" role="group" aria-label="趋势指标">
+              <button type="button" data-series="views" aria-pressed="true">浏览量</button>
+              <button type="button" data-series="submissions" aria-pressed="false">新增投稿</button>
+            </div>
+          </header>
+          <div class="chart-outer" id="chart-outer">
+            <div class="axis-y" id="axis-y" aria-hidden="true"></div>
+            <div class="chart" id="chart" tabindex="0" role="group" aria-label="按日趋势" aria-describedby="chart-help">
+              <span id="chart-help" class="sr-only">按左右方向键选择日期，也可展开下方每日数据表。</span>
+              <div id="chart-grid" class="chart-grid" aria-hidden="true"></div>
+              <div id="chart-gap" class="chart-gap" hidden aria-hidden="true"><span>此前未采集</span></div>
+              <svg class="plot" id="plot" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">
+                <defs><linearGradient id="plot-fill" x2="0" y2="1"><stop stop-color="var(--chart-color)" stop-opacity=".21"/><stop offset="1" stop-color="var(--chart-color)" stop-opacity=".02"/></linearGradient></defs>
+                <path class="plot-area" id="plot-area"></path>
+                <path class="plot-line" id="plot-line" vector-effect="non-scaling-stroke"></path>
+              </svg>
+              <div id="chart-cursor" class="chart-cursor" hidden aria-hidden="true"><i id="chart-dot"></i></div>
+              <div id="chart-tooltip" class="chart-tooltip" hidden aria-hidden="true"><span id="tooltip-day"></span><strong id="tooltip-value"></strong></div>
+              <p id="chart-status" class="sr-only" role="status"></p>
+            </div>
+            <div class="axis-x" id="axis-x" aria-hidden="true"></div>
           </div>
-          <div id="chart" class="chart" aria-hidden="true"></div>
-          <div class="chart-dates" aria-hidden="true"><span id="start-date"></span><span id="end-date"></span></div>
-          <details>
-            <summary>查看每日浏览量与新增投稿</summary>
-            <table><caption>按北京时间统计</caption><thead><tr><th scope="col">日期</th><th scope="col">浏览量</th><th scope="col">新增投稿</th></tr></thead><tbody id="daily"></tbody></table>
+          <details class="data-detail">
+            <summary>查看每日数据</summary>
+            <table><caption class="sr-only">每日浏览量与新增投稿（北京时间）</caption><thead><tr><th scope="col">日期</th><th scope="col">浏览量</th><th scope="col">新增投稿</th></tr></thead><tbody id="daily"></tbody></table>
           </details>
         </section>
-        <section class="panel detail" aria-labelledby="pages-title">
-          <h2 id="pages-title">各页面浏览量</h2>
+        <section class="panel ranking" aria-labelledby="pages-title">
+          <header class="panel-head"><div><h2 id="pages-title">页面访问排行</h2><p>按所选时段浏览量排序</p></div></header>
           <ul class="pages" id="pages"></ul>
         </section>
       </div>
+      <section class="workflow" aria-labelledby="routes-title">
+        <h2 id="routes-title">投稿与审核</h2>
+        <dl class="route-grid panel">
+          <div><dt>待审核路标</dt><dd class="value" id="pending">—</dd><dd class="metric-hint">当前待处理</dd></div>
+          <div><dt>审核通过音频</dt><dd class="value" id="approved-audio">—</dd><dd class="metric-hint">累计已发布路标原声</dd></div>
+          <div><dt>新增投稿</dt><dd class="value" id="submissions">—</dd><dd class="metric-hint" id="submitters">所选时段内</dd></div>
+          <div><dt>审核通过率</dt><dd class="value" id="approval-rate">—</dd><dd class="metric-hint" id="review-count">以已审核路标为基数</dd></div>
+        </dl>
+      </section>
       <footer class="notes">
-        <p>试用量按浏览器估算。换设备、换浏览器或清除站点数据可能重复计数。同一浏览器在 10 秒内重复打开同一页面只计一次。采集只使用站点随机标识，不记录姓名、邮箱或 IP 到统计表。</p>
-        <p id="updated"></p>
+        <details><summary>统计口径</summary><p id="tracking-start"></p><p>试用量按浏览器估算。更换设备、浏览器或清除站点数据可能重复计数。同一浏览器在 10 秒内重复打开同一页面只计一次。统计表使用随机标识，不记录姓名、邮箱或 IP。</p></details>
       </footer>
     </div>
   </main>
